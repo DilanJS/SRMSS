@@ -24,7 +24,9 @@ export async function apiRequest(path, options = {}) {
     } catch {
       detail = response.statusText || detail;
     }
-    throw new Error(detail);
+    const err = new Error(detail);
+    err.status = response.status;
+    throw err;
   }
 
   if (response.status === 204) {

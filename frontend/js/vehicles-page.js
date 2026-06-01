@@ -2,12 +2,15 @@ import { apiRequest } from "./api.js";
 import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
-let _container, _token;
+let _container, _token, _role;
 let editingId = null;
+
+const isAdmin = () => _role === "admin";
 
 export async function mount(container, token) {
   _container = container;
   _token = token;
+  _role = null;
   editingId = null;
   await loadPage();
 }
@@ -16,6 +19,7 @@ async function loadPage() {
   showLoader("Loading Vehicles…");
   try {
     const user = await fetchCurrentUser(_token);
+    _role = user.role;
     const vehicles = await apiRequest("/vehicles", { headers: authHeaders(_token) });
     render(user, vehicles);
   } finally {
@@ -39,7 +43,7 @@ function render(user, vehicles) {
     filterMarkup: renderFilters(`
       <input class="filter-input" id="vehicle-search" placeholder="Search registration or model">
       <button class="ghost-btn" id="vehicle-search-btn" type="button">Search</button>
-      <button class="primary-btn" id="create-vehicle-btn" type="button">+ New Vehicle</button>
+      ${isAdmin() ? `<button class="primary-btn" id="create-vehicle-btn" type="button">+ New Vehicle</button>` : ""}
     `),
     tableTitle: "Fleet",
     tableMarkup: renderEntityTable({
@@ -51,10 +55,10 @@ function render(user, vehicles) {
           <td>${v.fuel_type}</td>
           <td>${v.capacity}</td>
           <td><span class="badge ${v.status}">${v.status}</span></td>
-          <td><div class="table-actions">
+          <td>${isAdmin() ? `<div class="table-actions">
             <button class="table-btn" data-vehicle-edit="${v.id}">Edit</button>
             <button class="table-btn danger-btn" data-vehicle-delete="${v.id}" data-vehicle-reg="${v.registration_no}">Delete</button>
-          </div></td>
+          </div>` : ""}</td>
         </tr>
       `),
       emptyMessage: "No vehicles yet. Click + New Vehicle to add one.",
@@ -142,7 +146,7 @@ function openVehiclePanel(vehicle = null) {
 
 function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
-  document.getElementById("create-vehicle-btn").addEventListener("click", () => openVehiclePanel());
+  document.getElementById("create-vehicle-btn")?.addEventListener("click", () => openVehiclePanel());
   document.getElementById("vehicle-search-btn").addEventListener("click", applySearch);
 
   document.querySelectorAll("[data-vehicle-edit]").forEach((btn) => {

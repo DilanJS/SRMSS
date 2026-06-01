@@ -2,14 +2,17 @@ import { apiRequest } from "./api.js";
 import { renderEntityTable, renderFilters, renderInlineError, renderShellLayout, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
-let _container, _token;
+let _container, _token, _role;
 let vehicles = [];
 let activeTab = "fuel";
 let editingMaintenanceId = null;
 
+const canManage = () => _role === "admin" || _role === "manager";
+
 export async function mount(container, token) {
   _container = container;
   _token = token;
+  _role = null;
   editingMaintenanceId = null;
   activeTab = "fuel";
   await loadPage();
@@ -24,6 +27,7 @@ async function loadPage() {
       apiRequest("/maintenance/fuel-logs", { headers: authHeaders(_token) }),
       apiRequest("/maintenance/maintenance-logs", { headers: authHeaders(_token) }),
     ]);
+    _role = user.role;
     vehicles = vList;
     render(user, fuelLogs, maintenanceLogs);
   } finally {
@@ -69,7 +73,7 @@ function render(user, fuelLogs, maintenanceLogs) {
                 ${vehicleOptions()}
               </select>
               <button class="ghost-btn" id="fuel-filter-btn">Filter</button>
-              <button class="primary-btn" id="add-fuel-btn">+ Log Fuel</button>
+              ${canManage() ? `<button class="primary-btn" id="add-fuel-btn">+ Log Fuel</button>` : ""}
             `)}
             ${renderEntityTable({
               columns: ["Vehicle", "Date", "Liters", "Cost", "Odometer", "Station"],
@@ -101,7 +105,7 @@ function render(user, fuelLogs, maintenanceLogs) {
                 <option value="cancelled">Cancelled</option>
               </select>
               <button class="ghost-btn" id="maint-filter-btn">Filter</button>
-              <button class="primary-btn" id="add-maint-btn">+ Log Maintenance</button>
+              ${canManage() ? `<button class="primary-btn" id="add-maint-btn">+ Log Maintenance</button>` : ""}
             `)}
             ${renderEntityTable({
               columns: ["Vehicle", "Service Type", "Date", "Status", "Cost", "Workshop", "Actions"],
@@ -113,9 +117,9 @@ function render(user, fuelLogs, maintenanceLogs) {
                   <td><span class="badge ${l.status}">${l.status.replace(/_/g, " ")}</span></td>
                   <td>$${l.cost.toFixed(2)}</td>
                   <td>${l.workshop_name || "—"}</td>
-                  <td><div class="table-actions">
+                  <td>${canManage() ? `<div class="table-actions">
                     <button class="table-btn" data-maint-edit="${l.id}">Edit</button>
-                  </div></td>
+                  </div>` : ""}</td>
                 </tr>
               `),
               emptyMessage: "No maintenance logs recorded yet.",
@@ -230,8 +234,8 @@ function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
   document.getElementById("tab-fuel").addEventListener("click", () => switchTab("fuel"));
   document.getElementById("tab-maintenance").addEventListener("click", () => switchTab("maintenance"));
-  document.getElementById("add-fuel-btn").addEventListener("click", openFuelPanel);
-  document.getElementById("add-maint-btn").addEventListener("click", () => openMaintenancePanel());
+  document.getElementById("add-fuel-btn")?.addEventListener("click", openFuelPanel);
+  document.getElementById("add-maint-btn")?.addEventListener("click", () => openMaintenancePanel());
   document.getElementById("fuel-filter-btn").addEventListener("click", applyFuelFilter);
   document.getElementById("maint-filter-btn").addEventListener("click", applyMaintenanceFilter);
 

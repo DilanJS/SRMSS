@@ -14,8 +14,11 @@ export async function fetchCurrentUser(token) {
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (error) {
-    clearSession();
-    window.location.href = "/frontend/index.html";
+    // Only log out on authentication failure (401), not permission errors (403)
+    if (!error.status || error.status === 401) {
+      clearSession();
+      window.location.href = "/frontend/index.html";
+    }
     throw error;
   }
 }

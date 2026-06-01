@@ -2,15 +2,18 @@ import { apiRequest } from "./api.js";
 import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
-let _container, _token;
+let _container, _token, _role;
 let editingId = null;
 let routes = [];
 let vehicles = [];
 let drivers = [];
 
+const canManage = () => _role === "admin" || _role === "manager";
+
 export async function mount(container, token) {
   _container = container;
   _token = token;
+  _role = null;
   editingId = null;
   await loadPage();
 }
@@ -25,6 +28,7 @@ async function loadPage() {
       apiRequest("/vehicles", { headers: authHeaders(_token) }),
       apiRequest("/drivers", { headers: authHeaders(_token) }),
     ]);
+    _role = user.role;
     routes = r;
     vehicles = v;
     drivers = d;
@@ -75,7 +79,7 @@ function render(user, schedules) {
         <option value="emergency">Emergency</option>
       </select>
       <button class="ghost-btn" id="schedule-filter-btn" type="button">Filter</button>
-      <button class="primary-btn" id="create-schedule-btn" type="button">+ New Schedule</button>
+      ${canManage() ? `<button class="primary-btn" id="create-schedule-btn" type="button">+ New Schedule</button>` : ""}
     `),
     tableTitle: "Schedules",
     tableMarkup: renderEntityTable({
@@ -91,10 +95,10 @@ function render(user, schedules) {
             <span class="badge ${s.status}">${s.status}</span>
             ${s.emergency_update ? `<span class="badge emergency" style="margin-left:4px">!</span>` : ""}
           </td>
-          <td><div class="table-actions">
+          <td>${canManage() ? `<div class="table-actions">
             <button class="table-btn" data-sched-edit="${s.id}">Edit</button>
             <button class="table-btn danger-btn" data-sched-delete="${s.id}">Delete</button>
-          </div></td>
+          </div>` : ""}</td>
         </tr>
       `),
       emptyMessage: "No schedules yet. Click + New Schedule to create one.",
@@ -182,7 +186,7 @@ function openSchedulePanel(sched = null) {
 
 function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
-  document.getElementById("create-schedule-btn").addEventListener("click", () => openSchedulePanel());
+  document.getElementById("create-schedule-btn")?.addEventListener("click", () => openSchedulePanel());
   document.getElementById("schedule-filter-btn").addEventListener("click", applyFilter);
 
   document.querySelectorAll("[data-sched-edit]").forEach((btn) => {

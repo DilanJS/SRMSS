@@ -1,13 +1,13 @@
 const NAV_ITEMS = [
-  { key: "dashboard", label: "Dashboard", href: "/frontend/app.html#/dashboard" },
-  { key: "routes", label: "Routes", href: "/frontend/app.html#/routes" },
-  { key: "vehicles", label: "Vehicles", href: "/frontend/app.html#/vehicles" },
-  { key: "drivers", label: "Drivers", href: "/frontend/app.html#/drivers" },
-  { key: "schedules", label: "Schedules", href: "/frontend/app.html#/schedules" },
-  { key: "maintenance", label: "Fuel & Maintenance", href: "/frontend/app.html#/maintenance" },
-  { key: "reports", label: "Reports", href: "/frontend/app.html#/reports" },
-  { key: "users", label: "User Management", href: "/frontend/app.html#/users" },
-  { key: "profile", label: "My Profile", href: "/frontend/app.html#/profile" },
+  { key: "dashboard",   label: "Dashboard",          href: "/frontend/app.html#/dashboard",   roles: ["admin", "manager"] },
+  { key: "routes",      label: "Routes",              href: "/frontend/app.html#/routes",      roles: ["admin", "manager", "driver", "user"] },
+  { key: "vehicles",    label: "Vehicles",            href: "/frontend/app.html#/vehicles",    roles: ["admin", "manager"] },
+  { key: "drivers",     label: "Drivers",             href: "/frontend/app.html#/drivers",     roles: ["admin", "manager"] },
+  { key: "schedules",   label: "Schedules",           href: "/frontend/app.html#/schedules",   roles: ["admin", "manager", "driver"] },
+  { key: "maintenance", label: "Fuel & Maintenance",  href: "/frontend/app.html#/maintenance", roles: ["admin", "manager"] },
+  { key: "reports",     label: "Reports",             href: "/frontend/app.html#/reports",     roles: ["admin", "manager"] },
+  { key: "users",       label: "User Management",     href: "/frontend/app.html#/users",       roles: ["admin"] },
+  { key: "profile",     label: "My Profile",          href: "/frontend/app.html#/profile",     roles: ["admin", "manager", "driver", "user"] },
 ];
 
 export function renderLoginForm() {
@@ -143,8 +143,12 @@ export function renderShellLayout({ user, activeNav, title, subtitle, content })
           <span>Smart Route Management and Scheduling System</span>
         </div>
         <nav class="nav-list">
-          ${NAV_ITEMS.map((item) => renderNavItem(item, activeNav)).join("")}
+          ${NAV_ITEMS.map((item) => renderNavItem(item, activeNav, user.role)).join("")}
         </nav>
+        <div class="sidebar-role-badge">
+          <span class="badge ${user.role}">${user.role}</span>
+          <span>${user.full_name}</span>
+        </div>
       </aside>
       <section class="shell-main">
         <header class="topbar">
@@ -196,11 +200,9 @@ export function renderInlineError(id) {
   return `<div class="error-text" id="${id}"></div>`;
 }
 
-function renderNavItem(item, activeNav) {
+function renderNavItem(item, activeNav, role) {
+  if (item.roles && !item.roles.includes(role)) return "";
   const activeClass = item.key === activeNav ? "active" : "";
-  if (item.href === "#") {
-    return `<div class="nav-item ${activeClass}">${item.label}</div>`;
-  }
   return `<a class="nav-item ${activeClass}" href="${item.href}">${item.label}</a>`;
 }
 

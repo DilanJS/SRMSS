@@ -2,20 +2,24 @@ import { apiRequest } from "./api.js";
 import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
-let _container, _token;
+let _container, _token, _role;
 let editingId = null;
 
 export async function mount(container, token) {
   _container = container;
   _token = token;
+  _role = null;
   editingId = null;
   await loadPage();
 }
+
+const isAdmin = () => _role === "admin";
 
 async function loadPage() {
   showLoader("Loading Routes…");
   try {
     const user = await fetchCurrentUser(_token);
+    _role = user.role;
     const routes = await apiRequest("/routes", { headers: authHeaders(_token) });
     render(user, routes);
   } finally {
@@ -41,7 +45,7 @@ function render(user, routes) {
     filterMarkup: renderFilters(`
       <input class="filter-input" id="route-search" placeholder="Search route code or name">
       <button class="ghost-btn" id="route-search-btn" type="button">Search</button>
-      <button class="primary-btn" id="create-route-btn" type="button">+ New Route</button>
+      ${isAdmin() ? `<button class="primary-btn" id="create-route-btn" type="button">+ New Route</button>` : ""}
     `),
     tableTitle: "Routes",
     tableMarkup: renderEntityTable({
@@ -53,10 +57,10 @@ function render(user, routes) {
           <td>${route.service_type}</td>
           <td>${route.distance_km} km</td>
           <td><span class="badge ${route.active ? "active" : "inactive"}">${route.active ? "active" : "inactive"}</span></td>
-          <td><div class="table-actions">
+          <td>${isAdmin() ? `<div class="table-actions">
             <button class="table-btn" data-route-edit="${route.id}">Edit</button>
             <button class="table-btn danger-btn" data-route-delete="${route.id}" data-route-code="${route.route_code}">Delete</button>
-          </div></td>
+          </div>` : ""}</td>
         </tr>
       `),
       emptyMessage: "No routes yet. Click + New Route to create one.",
@@ -139,7 +143,7 @@ function openRoutePanel(route = null) {
 
 function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
-  document.getElementById("create-route-btn").addEventListener("click", () => openRoutePanel());
+  document.getElementById("create-route-btn")?.addEventListener("click", () => openRoutePanel());
   document.getElementById("route-search-btn").addEventListener("click", applyRouteSearch);
 
   document.querySelectorAll("[data-route-edit]").forEach((btn) => {

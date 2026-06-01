@@ -1,9 +1,16 @@
 import { apiRequest } from "./api.js";
 import { renderLoginForm } from "./components.js";
-import { getToken, saveSession } from "./auth.js";
+import { getToken, getUser, saveSession } from "./auth.js";
 
 if (getToken()) {
-  window.location.href = "/frontend/app.html#/dashboard";
+  const role = getUser()?.role;
+  if (role === "driver") {
+    window.location.href = "/frontend/app.html#/schedules";
+  } else if (role === "user") {
+    window.location.href = "/frontend/app.html#/routes";
+  } else {
+    window.location.href = "/frontend/app.html#/dashboard";
+  }
 }
 
 const app = document.getElementById("app");
@@ -31,7 +38,14 @@ form.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload),
     });
     saveSession(session);
-    window.location.href = "/frontend/app.html#/dashboard";
+    const role = session.user.role;
+    if (role === "admin" || role === "manager") {
+      window.location.href = "/frontend/app.html#/dashboard";
+    } else if (role === "driver") {
+      window.location.href = "/frontend/app.html#/schedules";
+    } else {
+      window.location.href = "/frontend/app.html#/routes";
+    }
   } catch (error) {
     errorNode.textContent = error.message;
   } finally {

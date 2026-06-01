@@ -33,8 +33,22 @@ async function loadDashboard() {
 
     hideLoader();
     document.getElementById("logout-btn").addEventListener("click", handleLogout);
-  } catch {
+  } catch (error) {
     hideLoader();
+    if (error.status === 403) {
+      _container.innerHTML = `
+        <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:40px;text-align:center">
+          <div style="font-size:48px">🔒</div>
+          <h2 style="font-family:'Space Grotesk',sans-serif;margin:0">Access Restricted</h2>
+          <p style="color:var(--text-soft);max-width:360px;margin:0">
+            The operations dashboard is available to admins and managers only.
+            You have been logged in with a <strong>driver</strong> or <strong>user</strong> account.
+          </p>
+          <a href="/frontend/app.html#/schedules" style="color:var(--accent);font-weight:700">Go to Schedules →</a>
+        </div>
+      `;
+      return;
+    }
     clearSession();
     window.location.href = "/frontend/index.html";
   }
