@@ -5,7 +5,49 @@ Accept: application/json
 
 ###
 
-GET http://127.0.0.1:8000/hello/User
+GET http://127.0.0.1:8000/health
 Accept: application/json
 
 ###
+
+POST http://127.0.0.1:8000/auth/register
+Content-Type: application/json
+
+{
+  "email": "admin@srmss.local",
+  "password": "Passw0rd!",
+  "full_name": "Depot Admin",
+  "role": "admin"
+}
+
+###
+
+POST http://127.0.0.1:8000/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@srmss.local",
+  "password": "Passw0rd!"
+}
+
+###
+
+GET http://127.0.0.1:8000/auth/me
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+PATCH http://127.0.0.1:8000/auth/me
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "full_name": "Main Depot Admin"
+}
+
+###
+
+POST http://127.0.0.1:8000/auth/logout
+Accept: application/json
+Authorization: Bearer {{access_token}}
