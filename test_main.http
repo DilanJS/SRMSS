@@ -38,6 +38,12 @@ Authorization: Bearer {{access_token}}
 
 ###
 
+GET http://127.0.0.1:8000/auth/sessions
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
 PATCH http://127.0.0.1:8000/auth/me
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -49,5 +55,128 @@ Authorization: Bearer {{access_token}}
 ###
 
 POST http://127.0.0.1:8000/auth/logout
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+POST http://127.0.0.1:8000/auth/logout-all
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/auth/users
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+POST http://127.0.0.1:8000/auth/users
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "email": "manager@srmss.local",
+  "password": "Passw0rd!",
+  "full_name": "Ops Manager",
+  "role": "manager"
+}
+
+###
+
+GET http://127.0.0.1:8000/auth/users/{{user_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+PATCH http://127.0.0.1:8000/auth/users/{{user_id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "role": "manager"
+}
+
+###
+
+DELETE http://127.0.0.1:8000/auth/users/{{user_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+POST http://127.0.0.1:8000/routes
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "route_code": "R-101",
+  "route_name": "Central to Harbor",
+  "start_point": "Central Depot",
+  "end_point": "Harbor Terminal",
+  "distance_km": 18.5,
+  "estimated_duration_minutes": 50,
+  "service_type": "city",
+  "active": true,
+  "stops": [
+    {
+      "name": "Central Depot",
+      "latitude": 6.9271,
+      "longitude": 79.8612,
+      "sequence": 1
+    },
+    {
+      "name": "Harbor Terminal",
+      "latitude": 6.9521,
+      "longitude": 79.8445,
+      "sequence": 2
+    }
+  ],
+  "path_points": [
+    [6.9271, 79.8612],
+    [6.9521, 79.8445]
+  ]
+}
+
+###
+
+GET http://127.0.0.1:8000/routes
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/routes?search=harbor
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/routes/{{route_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/routes/{{route_id}}/map
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+PATCH http://127.0.0.1:8000/routes/{{route_id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "distance_km": 20,
+  "estimated_duration_minutes": 55
+}
+
+###
+
+DELETE http://127.0.0.1:8000/routes/{{route_id}}
 Accept: application/json
 Authorization: Bearer {{access_token}}

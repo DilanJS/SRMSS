@@ -49,11 +49,22 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 
+class SessionResponse(BaseModel):
+    id: str
+    user_id: str
+    user_email: str
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None
+    is_active: bool
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+    session: SessionResponse
 
 
 class MessageResponse(BaseModel):
