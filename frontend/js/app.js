@@ -1,4 +1,5 @@
 import { getToken, requireAuth } from "./auth.js";
+import { initMobileNav } from "./components.js";
 
 const PAGE_MODULES = {
   "/dashboard": () => import("./dashboard-page.js"),
@@ -26,6 +27,7 @@ async function navigate() {
   try {
     const module = await route();
     await module.mount(app, token);
+    initMobileNav();
   } catch (error) {
     app.innerHTML = `<div style="padding:40px;color:#b63d2c">Failed to load page: ${error.message}</div>`;
   }

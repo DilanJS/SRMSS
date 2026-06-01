@@ -137,10 +137,14 @@ export function renderManagementPage({
 export function renderShellLayout({ user, activeNav, title, subtitle, content }) {
   return `
     <section class="dashboard-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <strong>SRMSS</strong>
-          <span>Smart Route Management and Scheduling System</span>
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="brand">
+            <strong>SRMSS</strong>
+            <span>Smart Route Management</span>
+          </div>
+          <button class="sidebar-close" id="sidebar-close" type="button" aria-label="Close menu">✕</button>
         </div>
         <nav class="nav-list">
           ${NAV_ITEMS.map((item) => renderNavItem(item, activeNav, user.role)).join("")}
@@ -152,15 +156,20 @@ export function renderShellLayout({ user, activeNav, title, subtitle, content })
       </aside>
       <section class="shell-main">
         <header class="topbar">
-          <div class="topbar-title">
-            <h1>${title}</h1>
-            <p>${subtitle}</p>
+          <div class="topbar-left">
+            <button class="hamburger-btn" id="hamburger-btn" type="button" aria-label="Open menu">
+              <span></span><span></span><span></span>
+            </button>
+            <div class="topbar-title">
+              <h1>${title}</h1>
+              <p class="topbar-subtitle">${subtitle}</p>
+            </div>
           </div>
           <div class="topbar-actions">
             <div class="user-chip">
               <div class="user-avatar">${getInitials(user.full_name)}</div>
-              <div>
-                <strong>${user.full_name}</strong><br>
+              <div class="user-chip-info">
+                <strong>${user.full_name}</strong>
                 <span>${user.role}</span>
               </div>
             </div>
@@ -171,6 +180,34 @@ export function renderShellLayout({ user, activeNav, title, subtitle, content })
       </section>
     </section>
   `;
+}
+
+export function initMobileNav() {
+  const hamburger = document.getElementById("hamburger-btn");
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebar-overlay");
+  const closeBtn = document.getElementById("sidebar-close");
+  if (!hamburger || !sidebar) return;
+
+  const open = () => {
+    sidebar.classList.add("open");
+    overlay.classList.add("visible");
+    document.body.style.overflow = "hidden";
+  };
+  const close = () => {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("visible");
+    document.body.style.overflow = "";
+  };
+
+  hamburger.addEventListener("click", open);
+  closeBtn?.addEventListener("click", close);
+  overlay.addEventListener("click", close);
+
+  // Close sidebar when a nav link is clicked on mobile
+  sidebar.querySelectorAll(".nav-item").forEach((link) => {
+    link.addEventListener("click", close);
+  });
 }
 
 export function renderEntityTable({ columns, rows, emptyMessage }) {
