@@ -1,5 +1,5 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
 let _container, _token;
@@ -25,6 +25,7 @@ async function loadPage() {
 
 function render(user, routes) {
   const activeRoutes = routes.filter((r) => r.active).length;
+
   _container.innerHTML = renderManagementPage({
     user,
     activeNav: "routes",
@@ -39,48 +40,9 @@ function render(user, routes) {
     ],
     filterMarkup: renderFilters(`
       <input class="filter-input" id="route-search" placeholder="Search route code or name">
-      <button class="ghost-btn" id="route-search-btn" type="button">Filter</button>
+      <button class="ghost-btn" id="route-search-btn" type="button">Search</button>
+      <button class="primary-btn" id="create-route-btn" type="button">+ New Route</button>
     `),
-    formTitle: "Route",
-    formMarkup: `
-      <div class="form-mode-label">
-        <span id="form-mode-text">Create Route</span>
-        <span class="edit-badge" id="edit-badge" style="display:none">Editing</span>
-      </div>
-      <form id="route-form" class="form-grid compact-form">
-        <div class="field"><label>Route Code</label><input name="route_code" required></div>
-        <div class="field"><label>Route Name</label><input name="route_name" required></div>
-        <div class="field"><label>Start Point</label><input name="start_point" required></div>
-        <div class="field"><label>End Point</label><input name="end_point" required></div>
-        <div class="split-grid">
-          <div class="field"><label>Distance KM</label><input name="distance_km" type="number" step="0.1" required></div>
-          <div class="field"><label>Duration Min</label><input name="estimated_duration_minutes" type="number" required></div>
-        </div>
-        <div class="field">
-          <label>Service Type</label>
-          <select name="service_type">
-            <option value="city">City</option>
-            <option value="suburban">Suburban</option>
-            <option value="express">Express</option>
-            <option value="intercity">Intercity</option>
-            <option value="school">School</option>
-            <option value="special">Special</option>
-          </select>
-        </div>
-        <div class="field" id="active-field" style="display:none">
-          <label>Status</label>
-          <select name="active">
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </select>
-        </div>
-        ${renderInlineError("route-form-error")}
-        <div class="form-actions">
-          <button class="primary-btn" type="submit" id="route-submit-btn">Create Route</button>
-          <button class="ghost-btn" type="button" id="route-cancel-btn" style="display:none">Cancel</button>
-        </div>
-      </form>
-    `,
     tableTitle: "Routes",
     tableMarkup: renderEntityTable({
       columns: ["Code", "Name", "Service", "Distance", "Status", "Actions"],
@@ -91,20 +53,94 @@ function render(user, routes) {
           <td>${route.service_type}</td>
           <td>${route.distance_km} km</td>
           <td><span class="badge ${route.active ? "active" : "inactive"}">${route.active ? "active" : "inactive"}</span></td>
-          <td style="display:flex;gap:6px">
+          <td><div class="table-actions">
             <button class="table-btn" data-route-edit="${route.id}">Edit</button>
             <button class="table-btn danger-btn" data-route-delete="${route.id}" data-route-code="${route.route_code}">Delete</button>
-          </td>
+          </div></td>
         </tr>
       `),
-      emptyMessage: "No routes available yet.",
+      emptyMessage: "No routes yet. Click + New Route to create one.",
     }),
   });
 
+  bindActions();
+}
+
+function buildFormHTML(route = null) {
+  const v = (field) => route ? (route[field] ?? "") : "";
+  return `
+    <form id="route-form" class="form-grid">
+      <div class="field">
+        <label>Route Code</label>
+        <input name="route_code" value="${v("route_code")}" placeholder="e.g. R-101" required>
+      </div>
+      <div class="field">
+        <label>Route Name</label>
+        <input name="route_name" value="${v("route_name")}" placeholder="e.g. City Centre Loop" required>
+      </div>
+      <div class="field">
+        <label>Start Point</label>
+        <input name="start_point" value="${v("start_point")}" placeholder="e.g. Central Bus Terminal" required>
+      </div>
+      <div class="field">
+        <label>End Point</label>
+        <input name="end_point" value="${v("end_point")}" placeholder="e.g. Airport Junction" required>
+      </div>
+      <div class="split-grid">
+        <div class="field">
+          <label>Distance (km)</label>
+          <input name="distance_km" type="number" step="0.1" min="0" value="${v("distance_km")}" required>
+        </div>
+        <div class="field">
+          <label>Duration (min)</label>
+          <input name="estimated_duration_minutes" type="number" min="1" value="${v("estimated_duration_minutes")}" required>
+        </div>
+      </div>
+      <div class="field">
+        <label>Service Type</label>
+        <select name="service_type">
+          ${["city", "suburban", "express", "intercity", "school", "special"].map((t) =>
+            `<option value="${t}" ${v("service_type") === t ? "selected" : ""}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`
+          ).join("")}
+        </select>
+      </div>
+      ${route ? `
+        <div class="field">
+          <label>Status</label>
+          <select name="active">
+            <option value="true" ${route.active ? "selected" : ""}>Active</option>
+            <option value="false" ${!route.active ? "selected" : ""}>Inactive</option>
+          </select>
+        </div>
+      ` : ""}
+      ${renderInlineError("route-form-error")}
+    </form>
+  `;
+}
+
+function openRoutePanel(route = null) {
+  editingId = route?.id || null;
+
+  openSidePanel({
+    title: route ? "Edit Route" : "New Route",
+    subtitle: route ? `Editing ${route.route_code}` : "Fill in the details to create a new route.",
+    body: buildFormHTML(route),
+    footer: `
+      <button class="primary-btn" id="route-panel-submit" type="button">
+        ${route ? "Save Changes" : "Create Route"}
+      </button>
+      <button class="ghost-btn" type="button" id="route-panel-cancel">Cancel</button>
+    `,
+  });
+
+  document.getElementById("route-panel-submit").addEventListener("click", submitRouteForm);
+  document.getElementById("route-panel-cancel").addEventListener("click", closeSidePanel);
+}
+
+function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
-  document.getElementById("route-form").addEventListener("submit", submitRouteForm);
+  document.getElementById("create-route-btn").addEventListener("click", () => openRoutePanel());
   document.getElementById("route-search-btn").addEventListener("click", applyRouteSearch);
-  document.getElementById("route-cancel-btn").addEventListener("click", resetForm);
 
   document.querySelectorAll("[data-route-edit]").forEach((btn) => {
     btn.addEventListener("click", () => startEdit(btn.dataset.routeEdit));
@@ -125,22 +161,7 @@ async function startEdit(id) {
   showLoader("Loading Route…");
   try {
     const route = await apiRequest(`/routes/${id}`, { headers: authHeaders(_token) });
-    editingId = id;
-    const form = document.getElementById("route-form");
-    form.route_code.value = route.route_code;
-    form.route_name.value = route.route_name;
-    form.start_point.value = route.start_point;
-    form.end_point.value = route.end_point;
-    form.distance_km.value = route.distance_km;
-    form.estimated_duration_minutes.value = route.estimated_duration_minutes;
-    form.service_type.value = route.service_type;
-    form.active.value = String(route.active);
-    document.getElementById("form-mode-text").textContent = "Edit Route";
-    document.getElementById("edit-badge").style.display = "";
-    document.getElementById("route-submit-btn").textContent = "Save Changes";
-    document.getElementById("route-cancel-btn").style.display = "";
-    document.getElementById("active-field").style.display = "";
-    form.scrollIntoView({ behavior: "smooth", block: "start" });
+    openRoutePanel(route);
   } catch {
     showToast("Could not load route data.", "error");
   } finally {
@@ -148,22 +169,13 @@ async function startEdit(id) {
   }
 }
 
-function resetForm() {
-  editingId = null;
-  document.getElementById("route-form").reset();
-  document.getElementById("form-mode-text").textContent = "Create Route";
-  document.getElementById("edit-badge").style.display = "none";
-  document.getElementById("route-submit-btn").textContent = "Create Route";
-  document.getElementById("route-cancel-btn").style.display = "none";
-  document.getElementById("active-field").style.display = "none";
-  document.getElementById("route-form-error").textContent = "";
-}
-
-async function submitRouteForm(event) {
-  event.preventDefault();
+async function submitRouteForm() {
   const errorNode = document.getElementById("route-form-error");
   errorNode.textContent = "";
-  const formData = new FormData(event.currentTarget);
+  const form = document.getElementById("route-form");
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+
+  const formData = new FormData(form);
   const payload = {
     route_code: formData.get("route_code"),
     route_name: formData.get("route_name"),
@@ -187,6 +199,7 @@ async function submitRouteForm(event) {
       await apiRequest("/routes", { method: "POST", headers: authHeaders(_token), body: JSON.stringify(payload) });
       showToast("Route created successfully.");
     }
+    closeSidePanel();
     await loadPage();
   } catch (error) {
     hideLoader();
@@ -208,7 +221,7 @@ async function deleteRoute(id) {
 
 async function applyRouteSearch() {
   const search = document.getElementById("route-search").value.trim();
-  showLoader("Filtering Routes…");
+  showLoader("Searching…");
   try {
     const user = await fetchCurrentUser(_token);
     const routes = await apiRequest(search ? `/routes?search=${encodeURIComponent(search)}` : "/routes", { headers: authHeaders(_token) });

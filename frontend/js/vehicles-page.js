@@ -1,5 +1,5 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
 let _container, _token;
@@ -38,53 +38,9 @@ function render(user, vehicles) {
     ],
     filterMarkup: renderFilters(`
       <input class="filter-input" id="vehicle-search" placeholder="Search registration or model">
-      <button class="ghost-btn" id="vehicle-search-btn" type="button">Filter</button>
+      <button class="ghost-btn" id="vehicle-search-btn" type="button">Search</button>
+      <button class="primary-btn" id="create-vehicle-btn" type="button">+ New Vehicle</button>
     `),
-    formTitle: "Vehicle",
-    formMarkup: `
-      <div class="form-mode-label">
-        <span id="form-mode-text">Add Vehicle</span>
-        <span class="edit-badge" id="edit-badge" style="display:none">Editing</span>
-      </div>
-      <form id="vehicle-form" class="form-grid compact-form">
-        <div class="split-grid">
-          <div class="field"><label>Registration</label><input name="registration_no" required></div>
-          <div class="field"><label>Fleet Number</label><input name="fleet_number" required></div>
-        </div>
-        <div class="split-grid">
-          <div class="field"><label>Model</label><input name="model" required></div>
-          <div class="field"><label>Manufacturer</label><input name="manufacturer" required></div>
-        </div>
-        <div class="split-grid">
-          <div class="field"><label>Capacity</label><input name="capacity" type="number" required></div>
-          <div class="field"><label>Mileage KM</label><input name="mileage_km" type="number" step="0.1" required></div>
-        </div>
-        <div class="field">
-          <label>Fuel Type</label>
-          <select name="fuel_type">
-            <option value="diesel">Diesel</option>
-            <option value="petrol">Petrol</option>
-            <option value="electric">Electric</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="cng">CNG</option>
-          </select>
-        </div>
-        <div class="field" id="status-field" style="display:none">
-          <label>Status</label>
-          <select name="status">
-            <option value="available">Available</option>
-            <option value="assigned">Assigned</option>
-            <option value="maintenance">Maintenance</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-        ${renderInlineError("vehicle-form-error")}
-        <div class="form-actions">
-          <button class="primary-btn" type="submit" id="vehicle-submit-btn">Add Vehicle</button>
-          <button class="ghost-btn" type="button" id="vehicle-cancel-btn" style="display:none">Cancel</button>
-        </div>
-      </form>
-    `,
     tableTitle: "Fleet",
     tableMarkup: renderEntityTable({
       columns: ["Registration", "Model", "Fuel", "Capacity", "Status", "Actions"],
@@ -95,20 +51,99 @@ function render(user, vehicles) {
           <td>${v.fuel_type}</td>
           <td>${v.capacity}</td>
           <td><span class="badge ${v.status}">${v.status}</span></td>
-          <td style="display:flex;gap:6px">
+          <td><div class="table-actions">
             <button class="table-btn" data-vehicle-edit="${v.id}">Edit</button>
             <button class="table-btn danger-btn" data-vehicle-delete="${v.id}" data-vehicle-reg="${v.registration_no}">Delete</button>
-          </td>
+          </div></td>
         </tr>
       `),
-      emptyMessage: "No vehicles available yet.",
+      emptyMessage: "No vehicles yet. Click + New Vehicle to add one.",
     }),
   });
 
+  bindActions();
+}
+
+function buildFormHTML(vehicle = null) {
+  const v = (field) => vehicle ? (vehicle[field] ?? "") : "";
+  const sel = (field, val) => v(field) === val ? "selected" : "";
+  return `
+    <form id="vehicle-form" class="form-grid">
+      <div class="split-grid">
+        <div class="field">
+          <label>Registration No.</label>
+          <input name="registration_no" value="${v("registration_no")}" placeholder="e.g. NB-1234" required>
+        </div>
+        <div class="field">
+          <label>Fleet Number</label>
+          <input name="fleet_number" value="${v("fleet_number")}" placeholder="e.g. FL-042" required>
+        </div>
+      </div>
+      <div class="split-grid">
+        <div class="field">
+          <label>Manufacturer</label>
+          <input name="manufacturer" value="${v("manufacturer")}" placeholder="e.g. Tata" required>
+        </div>
+        <div class="field">
+          <label>Model</label>
+          <input name="model" value="${v("model")}" placeholder="e.g. Starbus" required>
+        </div>
+      </div>
+      <div class="split-grid">
+        <div class="field">
+          <label>Capacity (seats)</label>
+          <input name="capacity" type="number" min="1" value="${v("capacity")}" required>
+        </div>
+        <div class="field">
+          <label>Mileage (km)</label>
+          <input name="mileage_km" type="number" step="0.1" min="0" value="${v("mileage_km")}" required>
+        </div>
+      </div>
+      <div class="field">
+        <label>Fuel Type</label>
+        <select name="fuel_type">
+          <option value="diesel" ${sel("fuel_type","diesel")}>Diesel</option>
+          <option value="petrol" ${sel("fuel_type","petrol")}>Petrol</option>
+          <option value="electric" ${sel("fuel_type","electric")}>Electric</option>
+          <option value="hybrid" ${sel("fuel_type","hybrid")}>Hybrid</option>
+          <option value="cng" ${sel("fuel_type","cng")}>CNG</option>
+        </select>
+      </div>
+      ${vehicle ? `
+        <div class="field">
+          <label>Status</label>
+          <select name="status">
+            <option value="available" ${sel("status","available")}>Available</option>
+            <option value="assigned" ${sel("status","assigned")}>Assigned</option>
+            <option value="maintenance" ${sel("status","maintenance")}>Maintenance</option>
+            <option value="inactive" ${sel("status","inactive")}>Inactive</option>
+          </select>
+        </div>
+      ` : ""}
+      ${renderInlineError("vehicle-form-error")}
+    </form>
+  `;
+}
+
+function openVehiclePanel(vehicle = null) {
+  editingId = vehicle?.id || null;
+  openSidePanel({
+    title: vehicle ? "Edit Vehicle" : "New Vehicle",
+    subtitle: vehicle ? `Editing ${vehicle.registration_no}` : "Add a new vehicle to the fleet.",
+    body: buildFormHTML(vehicle),
+    footer: `
+      <button class="primary-btn" id="vehicle-panel-submit" type="button">${vehicle ? "Save Changes" : "Add Vehicle"}</button>
+      <button class="ghost-btn" type="button" id="vehicle-panel-cancel">Cancel</button>
+    `,
+  });
+  document.getElementById("vehicle-panel-submit").addEventListener("click", submitVehicleForm);
+  document.getElementById("vehicle-panel-cancel").addEventListener("click", closeSidePanel);
+}
+
+function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
-  document.getElementById("vehicle-form").addEventListener("submit", submitVehicleForm);
-  document.getElementById("vehicle-search-btn").addEventListener("click", applyVehicleSearch);
-  document.getElementById("vehicle-cancel-btn").addEventListener("click", resetForm);
+  document.getElementById("create-vehicle-btn").addEventListener("click", () => openVehiclePanel());
+  document.getElementById("vehicle-search-btn").addEventListener("click", applySearch);
 
   document.querySelectorAll("[data-vehicle-edit]").forEach((btn) => {
     btn.addEventListener("click", () => startEdit(btn.dataset.vehicleEdit));
@@ -129,22 +164,7 @@ async function startEdit(id) {
   showLoader("Loading Vehicle…");
   try {
     const vehicle = await apiRequest(`/vehicles/${id}`, { headers: authHeaders(_token) });
-    editingId = id;
-    const form = document.getElementById("vehicle-form");
-    form.registration_no.value = vehicle.registration_no;
-    form.fleet_number.value = vehicle.fleet_number;
-    form.model.value = vehicle.model;
-    form.manufacturer.value = vehicle.manufacturer;
-    form.capacity.value = vehicle.capacity;
-    form.mileage_km.value = vehicle.mileage_km;
-    form.fuel_type.value = vehicle.fuel_type;
-    form.status.value = vehicle.status;
-    document.getElementById("form-mode-text").textContent = "Edit Vehicle";
-    document.getElementById("edit-badge").style.display = "";
-    document.getElementById("vehicle-submit-btn").textContent = "Save Changes";
-    document.getElementById("vehicle-cancel-btn").style.display = "";
-    document.getElementById("status-field").style.display = "";
-    form.scrollIntoView({ behavior: "smooth", block: "start" });
+    openVehiclePanel(vehicle);
   } catch {
     showToast("Could not load vehicle data.", "error");
   } finally {
@@ -152,27 +172,18 @@ async function startEdit(id) {
   }
 }
 
-function resetForm() {
-  editingId = null;
-  document.getElementById("vehicle-form").reset();
-  document.getElementById("form-mode-text").textContent = "Add Vehicle";
-  document.getElementById("edit-badge").style.display = "none";
-  document.getElementById("vehicle-submit-btn").textContent = "Add Vehicle";
-  document.getElementById("vehicle-cancel-btn").style.display = "none";
-  document.getElementById("status-field").style.display = "none";
-  document.getElementById("vehicle-form-error").textContent = "";
-}
-
-async function submitVehicleForm(event) {
-  event.preventDefault();
+async function submitVehicleForm() {
   const errorNode = document.getElementById("vehicle-form-error");
   errorNode.textContent = "";
-  const formData = new FormData(event.currentTarget);
+  const form = document.getElementById("vehicle-form");
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+
+  const formData = new FormData(form);
   const payload = {
     registration_no: formData.get("registration_no"),
     fleet_number: formData.get("fleet_number"),
-    model: formData.get("model"),
     manufacturer: formData.get("manufacturer"),
+    model: formData.get("model"),
     capacity: Number(formData.get("capacity")),
     mileage_km: Number(formData.get("mileage_km")),
     fuel_type: formData.get("fuel_type"),
@@ -190,6 +201,7 @@ async function submitVehicleForm(event) {
       await apiRequest("/vehicles", { method: "POST", headers: authHeaders(_token), body: JSON.stringify(payload) });
       showToast("Vehicle added successfully.");
     }
+    closeSidePanel();
     await loadPage();
   } catch (error) {
     hideLoader();
@@ -209,9 +221,9 @@ async function deleteVehicle(id) {
   }
 }
 
-async function applyVehicleSearch() {
+async function applySearch() {
   const search = document.getElementById("vehicle-search").value.trim();
-  showLoader("Filtering Vehicles…");
+  showLoader("Searching…");
   try {
     const user = await fetchCurrentUser(_token);
     const vehicles = await apiRequest(search ? `/vehicles?search=${encodeURIComponent(search)}` : "/vehicles", { headers: authHeaders(_token) });

@@ -164,12 +164,17 @@ body {
 .table-btn {
   appearance: none;
   border: 0;
-  border-radius: 16px;
-  padding: 14px 18px;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
   transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+}
+
+.primary-btn,
+.ghost-btn {
+  border-radius: 16px;
+  padding: 14px 18px;
+  font-weight: 800;
 }
 
 .primary-btn {
@@ -177,20 +182,47 @@ body {
   color: white;
 }
 
-.ghost-btn,
-.table-btn {
+.ghost-btn {
   background: rgba(15, 45, 47, 0.08);
   color: var(--text);
 }
 
+/* compact table row buttons */
+.table-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(15, 45, 47, 0.07);
+  color: var(--text);
+  border: 1px solid rgba(15, 45, 47, 0.1);
+}
+
+.table-btn:hover {
+  background: rgba(15, 45, 47, 0.13);
+}
+
 .danger-btn {
-  background: rgba(182, 61, 44, 0.12);
+  background: rgba(182, 61, 44, 0.08);
   color: var(--danger);
+  border-color: rgba(182, 61, 44, 0.15);
+}
+
+.danger-btn:hover {
+  background: rgba(182, 61, 44, 0.15);
+}
+
+.table-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .primary-btn:hover,
-.ghost-btn:hover,
-.table-btn:hover {
+.ghost-btn:hover {
   transform: translateY(-1px);
 }
 
@@ -370,6 +402,16 @@ body {
   display: flex;
   gap: 10px;
   margin-bottom: 16px;
+  align-items: center;
+}
+
+.filter-bar .filter-input {
+  flex: 1;
+}
+
+.filter-bar .primary-btn,
+.filter-bar .ghost-btn {
+  flex-shrink: 0;
 }
 
 .filter-input {
@@ -467,6 +509,118 @@ body {
 
 .empty-note {
   color: var(--text-soft);
+}
+
+/* ── Side Panel ── */
+.side-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: rgba(15, 45, 47, 0.32);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.side-panel-overlay.visible {
+  opacity: 1;
+}
+
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 440px;
+  max-width: 100vw;
+  background: #fff;
+  box-shadow: -32px 0 80px rgba(15, 45, 47, 0.16);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  z-index: 801;
+}
+
+.side-panel.open {
+  transform: translateX(0);
+}
+
+.side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 26px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.side-panel-title {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.side-panel-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.side-panel-close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: var(--text-soft);
+  transition: background 0.18s, color 0.18s;
+  line-height: 1;
+}
+
+.side-panel-close:hover {
+  background: rgba(15, 45, 47, 0.07);
+  color: var(--text);
+}
+
+.side-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 26px;
+}
+
+.side-panel-body .form-grid {
+  gap: 16px;
+}
+
+.side-panel-body .field input,
+.side-panel-body .field select,
+.side-panel-body .field textarea {
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
+.side-panel-footer {
+  padding: 18px 26px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.side-panel-footer .primary-btn {
+  flex: 1;
+}
+
+.side-panel-footer .ghost-btn {
+  flex: 0 0 auto;
 }
 
 /* ── Full-Screen Loader ── */

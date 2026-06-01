@@ -1,5 +1,5 @@
 import { apiRequest } from "./api.js";
-import { renderInlineError, renderShellLayout, showToast, showLoader, hideLoader } from "./components.js";
+import { renderInlineError, renderShellLayout, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
 let _container, _token;
@@ -23,16 +23,8 @@ async function loadPage() {
   }
 }
 
-function getInitials(name) {
-  return name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join("");
-}
-
-function fmt(value) {
-  return new Date(value).toLocaleString([], {
-    year: "numeric", month: "short", day: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
+const getInitials = (name) => name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join("");
+const fmt = (value) => new Date(value).toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 function render(user, sessions) {
   _container.innerHTML = renderShellLayout({
@@ -52,19 +44,7 @@ function render(user, sessions) {
                 <span class="badge assigned" style="margin-top:6px">${user.role}</span>
               </div>
             </div>
-            <h3>Update Profile</h3>
-            <form id="profile-form" class="form-grid compact-form">
-              <div class="field">
-                <label>Full Name</label>
-                <input name="full_name" value="${user.full_name}" minlength="2" maxlength="100" required>
-              </div>
-              <div class="field">
-                <label>New Password (leave blank to keep current)</label>
-                <input name="password" type="password" minlength="8" maxlength="128" placeholder="Min 8 characters">
-              </div>
-              ${renderInlineError("profile-form-error")}
-              <button class="primary-btn" type="submit">Save Changes</button>
-            </form>
+            <button class="primary-btn" id="edit-profile-btn" type="button" style="width:100%;margin-top:8px">Edit Profile</button>
           </div>
 
           <div class="profile-card">
@@ -77,8 +57,11 @@ function render(user, sessions) {
                     <div class="session-meta">Created ${fmt(s.created_at)}</div>
                     <div class="session-meta">Expires ${fmt(s.expires_at)}</div>
                   </div>
-                  <div style="text-align:right">
-                    ${s.token === _token ? `<div class="session-current">Current</div>` : `<button class="table-btn danger-btn" data-revoke="${s.token}">Revoke</button>`}
+                  <div>
+                    ${s.token === _token
+                      ? `<span class="session-current">Current</span>`
+                      : `<div class="table-actions"><button class="table-btn danger-btn" data-revoke="${s.token}">Revoke</button></div>`
+                    }
                   </div>
                 </div>
               `).join("") : `<p class="empty-note">No active sessions found.</p>`}
@@ -93,17 +76,14 @@ function render(user, sessions) {
   });
 
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
-  document.getElementById("profile-form").addEventListener("submit", submitProfileForm);
+  document.getElementById("edit-profile-btn").addEventListener("click", () => openProfilePanel(user));
   document.getElementById("logout-all-btn").addEventListener("click", logoutAll);
 
   document.querySelectorAll("[data-revoke]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       showLoader("Revoking Session…");
       try {
-        await apiRequest("/auth/logout", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${btn.dataset.revoke}` },
-        });
+        await apiRequest("/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${btn.dataset.revoke}` } });
         showToast("Session revoked.");
         await loadPage();
       } catch (e) {
@@ -114,11 +94,36 @@ function render(user, sessions) {
   });
 }
 
-async function submitProfileForm(event) {
-  event.preventDefault();
+function openProfilePanel(user) {
+  openSidePanel({
+    title: "Edit Profile",
+    subtitle: "Update your display name or password.",
+    body: `
+      <form id="profile-form" class="form-grid">
+        <div class="field">
+          <label>Full Name</label>
+          <input name="full_name" value="${user.full_name}" minlength="2" maxlength="100" required>
+        </div>
+        <div class="field">
+          <label>New Password</label>
+          <input name="password" type="password" minlength="8" maxlength="128" placeholder="Leave blank to keep current">
+        </div>
+        ${renderInlineError("profile-form-error")}
+      </form>
+    `,
+    footer: `
+      <button class="primary-btn" id="profile-panel-submit" type="button">Save Changes</button>
+      <button class="ghost-btn" type="button" id="profile-panel-cancel">Cancel</button>
+    `,
+  });
+  document.getElementById("profile-panel-submit").addEventListener("click", submitProfileForm);
+  document.getElementById("profile-panel-cancel").addEventListener("click", closeSidePanel);
+}
+
+async function submitProfileForm() {
   const errorNode = document.getElementById("profile-form-error");
   errorNode.textContent = "";
-  const fd = new FormData(event.currentTarget);
+  const fd = new FormData(document.getElementById("profile-form"));
   const payload = {};
   const name = fd.get("full_name").trim();
   const password = fd.get("password").trim();
@@ -134,6 +139,7 @@ async function submitProfileForm(event) {
   try {
     await apiRequest("/auth/me", { method: "PATCH", headers: authHeaders(_token), body: JSON.stringify(payload) });
     showToast("Profile updated.");
+    closeSidePanel();
     await loadPage();
   } catch (e) {
     hideLoader();

@@ -98,6 +98,7 @@ export function renderManagementPage({
   tableTitle,
   tableMarkup,
 }) {
+  const hasForm = Boolean(formMarkup);
   return renderShellLayout({
     user,
     activeNav,
@@ -108,17 +109,25 @@ export function renderManagementPage({
         <div class="stats-grid">
           ${statsCards.map(renderStatCard).join("")}
         </div>
-        <div class="management-grid">
+        ${hasForm ? `
+          <div class="management-grid">
+            <section class="panel">
+              <h3>${tableTitle}</h3>
+              ${filterMarkup}
+              ${tableMarkup}
+            </section>
+            <section class="panel">
+              <h3>${formTitle}</h3>
+              ${formMarkup}
+            </section>
+          </div>
+        ` : `
           <section class="panel">
             <h3>${tableTitle}</h3>
             ${filterMarkup}
             ${tableMarkup}
           </section>
-          <section class="panel">
-            <h3>${formTitle}</h3>
-            ${formMarkup}
-          </section>
-        </div>
+        `}
       </section>
     `,
   });
@@ -234,6 +243,56 @@ function getInitials(name) {
     .slice(0, 2)
     .map((part) => part[0].toUpperCase())
     .join("");
+}
+
+// ── Side Panel ───────────────────────────────────────────────────────────────
+
+export function openSidePanel({ title, subtitle = "", body, footer = "" }) {
+  closeSidePanel();
+
+  const overlay = document.createElement("div");
+  overlay.className = "side-panel-overlay";
+  overlay.id = "side-panel-overlay";
+
+  const panel = document.createElement("div");
+  panel.className = "side-panel";
+  panel.id = "side-panel";
+  panel.innerHTML = `
+    <div class="side-panel-header">
+      <div>
+        <h2 class="side-panel-title">${title}</h2>
+        ${subtitle ? `<p class="side-panel-subtitle">${subtitle}</p>` : ""}
+      </div>
+      <button class="side-panel-close" id="side-panel-close" type="button">✕</button>
+    </div>
+    <div class="side-panel-body">${body}</div>
+    ${footer ? `<div class="side-panel-footer">${footer}</div>` : ""}
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(panel);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add("visible");
+    panel.classList.add("open");
+  });
+
+  overlay.addEventListener("click", closeSidePanel);
+  document.getElementById("side-panel-close").addEventListener("click", closeSidePanel);
+}
+
+export function closeSidePanel() {
+  const overlay = document.getElementById("side-panel-overlay");
+  const panel = document.getElementById("side-panel");
+  if (!panel) return;
+
+  overlay?.classList.remove("visible");
+  panel.classList.remove("open");
+
+  panel.addEventListener("transitionend", () => {
+    overlay?.remove();
+    panel.remove();
+  }, { once: true });
 }
 
 // ── Full-Screen Loader ───────────────────────────────────────────────────────

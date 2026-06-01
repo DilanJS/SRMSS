@@ -1,5 +1,5 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
 let _container, _token;
@@ -38,68 +38,106 @@ function render(user, drivers) {
     ],
     filterMarkup: renderFilters(`
       <input class="filter-input" id="driver-search" placeholder="Search name or employee number">
-      <button class="ghost-btn" id="driver-search-btn" type="button">Filter</button>
+      <button class="ghost-btn" id="driver-search-btn" type="button">Search</button>
+      <button class="primary-btn" id="create-driver-btn" type="button">+ New Driver</button>
     `),
-    formTitle: "Driver",
-    formMarkup: `
-      <div class="form-mode-label">
-        <span id="form-mode-text">Add Driver</span>
-        <span class="edit-badge" id="edit-badge" style="display:none">Editing</span>
-      </div>
-      <form id="driver-form" class="form-grid compact-form">
-        <div class="split-grid">
-          <div class="field"><label>Employee No</label><input name="employee_no" required></div>
-          <div class="field"><label>Full Name</label><input name="full_name" required></div>
-        </div>
-        <div class="split-grid">
-          <div class="field"><label>License No</label><input name="license_no" required></div>
-          <div class="field"><label>Phone</label><input name="phone_number" required></div>
-        </div>
-        <div class="split-grid">
-          <div class="field"><label>Experience (yrs)</label><input name="years_of_experience" type="number" required></div>
-          <div class="field"><label>Working Hours</label><input name="working_hours" type="number" step="0.1" required></div>
-        </div>
-        <div class="field"><label>Hire Date</label><input name="hire_date" type="date" required></div>
-        <div class="field" id="status-field" style="display:none">
-          <label>Status</label>
-          <select name="status">
-            <option value="available">Available</option>
-            <option value="assigned">Assigned</option>
-            <option value="on_leave">On Leave</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-        ${renderInlineError("driver-form-error")}
-        <div class="form-actions">
-          <button class="primary-btn" type="submit" id="driver-submit-btn">Add Driver</button>
-          <button class="ghost-btn" type="button" id="driver-cancel-btn" style="display:none">Cancel</button>
-        </div>
-      </form>
-    `,
     tableTitle: "Drivers",
     tableMarkup: renderEntityTable({
-      columns: ["Employee", "Name", "License", "Hours", "Status", "Actions"],
+      columns: ["Employee No.", "Name", "License", "Hours", "Status", "Actions"],
       rows: drivers.map((d) => `
         <tr>
           <td>${d.employee_no}</td>
           <td>${d.full_name}</td>
           <td>${d.license_no}</td>
-          <td>${d.working_hours}</td>
-          <td><span class="badge ${d.status}">${d.status}</span></td>
-          <td style="display:flex;gap:6px">
+          <td>${d.working_hours} hrs</td>
+          <td><span class="badge ${d.status}">${d.status.replace("_", " ")}</span></td>
+          <td><div class="table-actions">
             <button class="table-btn" data-driver-edit="${d.id}">Edit</button>
             <button class="table-btn danger-btn" data-driver-delete="${d.id}" data-driver-name="${d.full_name}">Delete</button>
-          </td>
+          </div></td>
         </tr>
       `),
-      emptyMessage: "No drivers available yet.",
+      emptyMessage: "No drivers yet. Click + New Driver to add one.",
     }),
   });
 
+  bindActions();
+}
+
+function buildFormHTML(driver = null) {
+  const v = (field) => driver ? (driver[field] ?? "") : "";
+  const sel = (field, val) => v(field) === val ? "selected" : "";
+  return `
+    <form id="driver-form" class="form-grid">
+      <div class="split-grid">
+        <div class="field">
+          <label>Employee No.</label>
+          <input name="employee_no" value="${v("employee_no")}" placeholder="e.g. EMP-001" required>
+        </div>
+        <div class="field">
+          <label>Full Name</label>
+          <input name="full_name" value="${v("full_name")}" placeholder="e.g. John Silva" required>
+        </div>
+      </div>
+      <div class="split-grid">
+        <div class="field">
+          <label>License No.</label>
+          <input name="license_no" value="${v("license_no")}" placeholder="e.g. DL-456789" required>
+        </div>
+        <div class="field">
+          <label>Phone</label>
+          <input name="phone_number" value="${v("phone_number")}" placeholder="e.g. 077-1234567" required>
+        </div>
+      </div>
+      <div class="split-grid">
+        <div class="field">
+          <label>Experience (yrs)</label>
+          <input name="years_of_experience" type="number" min="0" value="${v("years_of_experience")}" required>
+        </div>
+        <div class="field">
+          <label>Working Hours/Day</label>
+          <input name="working_hours" type="number" step="0.5" min="0" max="24" value="${v("working_hours")}" required>
+        </div>
+      </div>
+      <div class="field">
+        <label>Hire Date</label>
+        <input name="hire_date" type="date" value="${v("hire_date") ? String(v("hire_date")).slice(0, 10) : ""}" required>
+      </div>
+      ${driver ? `
+        <div class="field">
+          <label>Status</label>
+          <select name="status">
+            <option value="available" ${sel("status","available")}>Available</option>
+            <option value="assigned" ${sel("status","assigned")}>Assigned</option>
+            <option value="on_leave" ${sel("status","on_leave")}>On Leave</option>
+            <option value="inactive" ${sel("status","inactive")}>Inactive</option>
+          </select>
+        </div>
+      ` : ""}
+      ${renderInlineError("driver-form-error")}
+    </form>
+  `;
+}
+
+function openDriverPanel(driver = null) {
+  editingId = driver?.id || null;
+  openSidePanel({
+    title: driver ? "Edit Driver" : "New Driver",
+    subtitle: driver ? `Editing ${driver.full_name}` : "Add a new driver to the workforce.",
+    body: buildFormHTML(driver),
+    footer: `
+      <button class="primary-btn" id="driver-panel-submit" type="button">${driver ? "Save Changes" : "Add Driver"}</button>
+      <button class="ghost-btn" type="button" id="driver-panel-cancel">Cancel</button>
+    `,
+  });
+  document.getElementById("driver-panel-submit").addEventListener("click", submitDriverForm);
+  document.getElementById("driver-panel-cancel").addEventListener("click", closeSidePanel);
+}
+
+function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
-  document.getElementById("driver-form").addEventListener("submit", submitDriverForm);
-  document.getElementById("driver-search-btn").addEventListener("click", applyDriverSearch);
-  document.getElementById("driver-cancel-btn").addEventListener("click", resetForm);
+  document.getElementById("create-driver-btn").addEventListener("click", () => openDriverPanel());
+  document.getElementById("driver-search-btn").addEventListener("click", applySearch);
 
   document.querySelectorAll("[data-driver-edit]").forEach((btn) => {
     btn.addEventListener("click", () => startEdit(btn.dataset.driverEdit));
@@ -120,22 +158,7 @@ async function startEdit(id) {
   showLoader("Loading Driver…");
   try {
     const driver = await apiRequest(`/drivers/${id}`, { headers: authHeaders(_token) });
-    editingId = id;
-    const form = document.getElementById("driver-form");
-    form.employee_no.value = driver.employee_no;
-    form.full_name.value = driver.full_name;
-    form.license_no.value = driver.license_no;
-    form.phone_number.value = driver.phone_number;
-    form.years_of_experience.value = driver.years_of_experience;
-    form.working_hours.value = driver.working_hours;
-    form.hire_date.value = driver.hire_date ? driver.hire_date.slice(0, 10) : "";
-    form.status.value = driver.status;
-    document.getElementById("form-mode-text").textContent = "Edit Driver";
-    document.getElementById("edit-badge").style.display = "";
-    document.getElementById("driver-submit-btn").textContent = "Save Changes";
-    document.getElementById("driver-cancel-btn").style.display = "";
-    document.getElementById("status-field").style.display = "";
-    form.scrollIntoView({ behavior: "smooth", block: "start" });
+    openDriverPanel(driver);
   } catch {
     showToast("Could not load driver data.", "error");
   } finally {
@@ -143,22 +166,13 @@ async function startEdit(id) {
   }
 }
 
-function resetForm() {
-  editingId = null;
-  document.getElementById("driver-form").reset();
-  document.getElementById("form-mode-text").textContent = "Add Driver";
-  document.getElementById("edit-badge").style.display = "none";
-  document.getElementById("driver-submit-btn").textContent = "Add Driver";
-  document.getElementById("driver-cancel-btn").style.display = "none";
-  document.getElementById("status-field").style.display = "none";
-  document.getElementById("driver-form-error").textContent = "";
-}
-
-async function submitDriverForm(event) {
-  event.preventDefault();
+async function submitDriverForm() {
   const errorNode = document.getElementById("driver-form-error");
   errorNode.textContent = "";
-  const formData = new FormData(event.currentTarget);
+  const form = document.getElementById("driver-form");
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+
+  const formData = new FormData(form);
   const payload = {
     employee_no: formData.get("employee_no"),
     full_name: formData.get("full_name"),
@@ -184,6 +198,7 @@ async function submitDriverForm(event) {
       await apiRequest("/drivers", { method: "POST", headers: authHeaders(_token), body: JSON.stringify(payload) });
       showToast("Driver added successfully.");
     }
+    closeSidePanel();
     await loadPage();
   } catch (error) {
     hideLoader();
@@ -203,9 +218,9 @@ async function deleteDriver(id) {
   }
 }
 
-async function applyDriverSearch() {
+async function applySearch() {
   const search = document.getElementById("driver-search").value.trim();
-  showLoader("Filtering Drivers…");
+  showLoader("Searching…");
   try {
     const user = await fetchCurrentUser(_token);
     const drivers = await apiRequest(search ? `/drivers?search=${encodeURIComponent(search)}` : "/drivers", { headers: authHeaders(_token) });

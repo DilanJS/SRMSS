@@ -1,5 +1,5 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
 let _container, _token;
@@ -17,58 +17,36 @@ export async function mount(container, token) {
 
 async function loadPage() {
   showLoader("Loading Schedules…");
-  const [user, schedules, r, v, d] = await Promise.all([
-    fetchCurrentUser(_token),
-    apiRequest("/schedules", { headers: authHeaders(_token) }),
-    apiRequest("/routes", { headers: authHeaders(_token) }),
-    apiRequest("/vehicles", { headers: authHeaders(_token) }),
-    apiRequest("/drivers", { headers: authHeaders(_token) }),
-  ]);
-  routes = r;
-  vehicles = v;
-  drivers = d;
-  render(user, schedules);
-  hideLoader();
+  try {
+    const [user, schedules, r, v, d] = await Promise.all([
+      fetchCurrentUser(_token),
+      apiRequest("/schedules", { headers: authHeaders(_token) }),
+      apiRequest("/routes", { headers: authHeaders(_token) }),
+      apiRequest("/vehicles", { headers: authHeaders(_token) }),
+      apiRequest("/drivers", { headers: authHeaders(_token) }),
+    ]);
+    routes = r;
+    vehicles = v;
+    drivers = d;
+    render(user, schedules);
+  } finally {
+    hideLoader();
+  }
 }
 
-function fmt(value) {
-  return new Date(value).toLocaleString([], {
-    month: "short", day: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
-
-function routeName(id) {
-  const r = routes.find((x) => x.id === id);
-  return r ? `${r.route_code} – ${r.route_name}` : id;
-}
-
-function vehicleName(id) {
-  const v = vehicles.find((x) => x.id === id);
-  return v ? v.registration_no : id;
-}
-
-function driverName(id) {
-  const d = drivers.find((x) => x.id === id);
-  return d ? d.full_name : id;
-}
+const fmt = (value) => new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const routeName = (id) => { const r = routes.find((x) => x.id === id); return r ? `${r.route_code} – ${r.route_name}` : id; };
+const vehicleName = (id) => { const v = vehicles.find((x) => x.id === id); return v ? v.registration_no : id; };
+const driverName = (id) => { const d = drivers.find((x) => x.id === id); return d ? d.full_name : id; };
 
 function routeOptions(selected = "") {
-  return routes.map((r) =>
-    `<option value="${r.id}" ${r.id === selected ? "selected" : ""}>${r.route_code} – ${r.route_name}</option>`
-  ).join("");
+  return routes.map((r) => `<option value="${r.id}" ${r.id === selected ? "selected" : ""}>${r.route_code} – ${r.route_name}</option>`).join("");
 }
-
 function vehicleOptions(selected = "") {
-  return vehicles.map((v) =>
-    `<option value="${v.id}" ${v.id === selected ? "selected" : ""}>${v.registration_no} (${v.manufacturer} ${v.model})</option>`
-  ).join("");
+  return vehicles.map((v) => `<option value="${v.id}" ${v.id === selected ? "selected" : ""}>${v.registration_no} (${v.manufacturer} ${v.model})</option>`).join("");
 }
-
 function driverOptions(selected = "") {
-  return drivers.map((d) =>
-    `<option value="${d.id}" ${d.id === selected ? "selected" : ""}>${d.full_name} (${d.employee_no})</option>`
-  ).join("");
+  return drivers.map((d) => `<option value="${d.id}" ${d.id === selected ? "selected" : ""}>${d.full_name} (${d.employee_no})</option>`).join("");
 }
 
 function render(user, schedules) {
@@ -80,7 +58,7 @@ function render(user, schedules) {
     title: "Schedule Management",
     subtitle: "Plan and monitor all route trips, detect conflicts, and handle emergency updates.",
     statsCards: [
-      { label: "Total Schedules", value: schedules.length },
+      { label: "Total", value: schedules.length },
       { label: "Scheduled", value: byStatus("scheduled") },
       { label: "Active", value: byStatus("active") },
       { label: "Completed", value: byStatus("completed") },
@@ -96,55 +74,9 @@ function render(user, schedules) {
         <option value="delayed">Delayed</option>
         <option value="emergency">Emergency</option>
       </select>
-      <button class="ghost-btn" id="schedule-search-btn" type="button">Filter</button>
+      <button class="ghost-btn" id="schedule-filter-btn" type="button">Filter</button>
+      <button class="primary-btn" id="create-schedule-btn" type="button">+ New Schedule</button>
     `),
-    formTitle: "Schedule",
-    formMarkup: `
-      <div class="form-mode-label">
-        <span id="form-mode-text">Create Schedule</span>
-        <span class="edit-badge" id="edit-badge" style="display:none">Editing</span>
-      </div>
-      <form id="schedule-form" class="form-grid compact-form">
-        <div class="field">
-          <label>Route</label>
-          <select name="route_id" required>${routeOptions()}</select>
-        </div>
-        <div class="field">
-          <label>Vehicle</label>
-          <select name="vehicle_id" required>${vehicleOptions()}</select>
-        </div>
-        <div class="field">
-          <label>Driver</label>
-          <select name="driver_id" required>${driverOptions()}</select>
-        </div>
-        <div class="split-grid">
-          <div class="field"><label>Departure</label><input name="departure_time" type="datetime-local" required></div>
-          <div class="field"><label>Arrival</label><input name="arrival_time" type="datetime-local" required></div>
-        </div>
-        <div class="field" id="status-edit-field" style="display:none">
-          <label>Status</label>
-          <select name="status">
-            <option value="scheduled">Scheduled</option>
-            <option value="active">Active</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="delayed">Delayed</option>
-            <option value="emergency">Emergency</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Notes (optional)</label>
-          <input name="notes" type="text" maxlength="500">
-        </div>
-        <div id="conflict-warning" class="error-text" style="display:none"></div>
-        ${renderInlineError("schedule-form-error")}
-        <div class="form-actions">
-          <button class="ghost-btn" type="button" id="check-conflicts-btn">Check Conflicts</button>
-          <button class="primary-btn" type="submit" id="schedule-submit-btn">Create Schedule</button>
-        </div>
-        <button class="ghost-btn" type="button" id="schedule-cancel-btn" style="display:none">Cancel Edit</button>
-      </form>
-    `,
     tableTitle: "Schedules",
     tableMarkup: renderEntityTable({
       columns: ["Route", "Vehicle", "Driver", "Departure", "Arrival", "Status", "Actions"],
@@ -159,29 +91,99 @@ function render(user, schedules) {
             <span class="badge ${s.status}">${s.status}</span>
             ${s.emergency_update ? `<span class="badge emergency" style="margin-left:4px">!</span>` : ""}
           </td>
-          <td style="display:flex;gap:6px">
+          <td><div class="table-actions">
             <button class="table-btn" data-sched-edit="${s.id}">Edit</button>
             <button class="table-btn danger-btn" data-sched-delete="${s.id}">Delete</button>
-          </td>
+          </div></td>
         </tr>
       `),
-      emptyMessage: "No schedules found.",
+      emptyMessage: "No schedules yet. Click + New Schedule to create one.",
     }),
   });
 
-  bindSharedActions();
-  bindScheduleActions();
+  bindActions();
 }
 
-function bindSharedActions() {
-  document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
+function buildFormHTML(sched = null) {
+  const v = (field) => sched ? (sched[field] ?? "") : "";
+  const sel = (field, val) => v(field) === val ? "selected" : "";
+  return `
+    <form id="schedule-form" class="form-grid">
+      <div class="field">
+        <label>Route</label>
+        <select name="route_id" required>
+          <option value="">Select a route…</option>
+          ${routeOptions(v("route_id"))}
+        </select>
+      </div>
+      <div class="field">
+        <label>Vehicle</label>
+        <select name="vehicle_id" required>
+          <option value="">Select a vehicle…</option>
+          ${vehicleOptions(v("vehicle_id"))}
+        </select>
+      </div>
+      <div class="field">
+        <label>Driver</label>
+        <select name="driver_id" required>
+          <option value="">Select a driver…</option>
+          ${driverOptions(v("driver_id"))}
+        </select>
+      </div>
+      <div class="split-grid">
+        <div class="field">
+          <label>Departure</label>
+          <input name="departure_time" type="datetime-local" value="${v("departure_time") ? toLocalDatetime(v("departure_time")) : ""}" required>
+        </div>
+        <div class="field">
+          <label>Arrival</label>
+          <input name="arrival_time" type="datetime-local" value="${v("arrival_time") ? toLocalDatetime(v("arrival_time")) : ""}" required>
+        </div>
+      </div>
+      ${sched ? `
+        <div class="field">
+          <label>Status</label>
+          <select name="status">
+            <option value="scheduled" ${sel("status","scheduled")}>Scheduled</option>
+            <option value="active" ${sel("status","active")}>Active</option>
+            <option value="completed" ${sel("status","completed")}>Completed</option>
+            <option value="cancelled" ${sel("status","cancelled")}>Cancelled</option>
+            <option value="delayed" ${sel("status","delayed")}>Delayed</option>
+            <option value="emergency" ${sel("status","emergency")}>Emergency</option>
+          </select>
+        </div>
+      ` : ""}
+      <div class="field">
+        <label>Notes (optional)</label>
+        <input name="notes" type="text" maxlength="500" value="${v("notes") || ""}">
+      </div>
+      <div id="conflict-warning" class="error-text" style="display:none"></div>
+      ${renderInlineError("schedule-form-error")}
+    </form>
+  `;
 }
 
-function bindScheduleActions() {
-  document.getElementById("schedule-form").addEventListener("submit", submitScheduleForm);
-  document.getElementById("schedule-cancel-btn").addEventListener("click", resetForm);
-  document.getElementById("schedule-search-btn").addEventListener("click", applyFilter);
+function openSchedulePanel(sched = null) {
+  editingId = sched?.id || null;
+  openSidePanel({
+    title: sched ? "Edit Schedule" : "New Schedule",
+    subtitle: sched ? `Editing schedule entry` : "Plan a new trip assignment.",
+    body: buildFormHTML(sched),
+    footer: `
+      <button class="ghost-btn" id="check-conflicts-btn" type="button">Check Conflicts</button>
+      <button class="primary-btn" id="schedule-panel-submit" type="button">${sched ? "Save Changes" : "Create Schedule"}</button>
+      <button class="ghost-btn" type="button" id="schedule-panel-cancel">Cancel</button>
+    `,
+  });
+  document.getElementById("schedule-panel-submit").addEventListener("click", submitScheduleForm);
+  document.getElementById("schedule-panel-cancel").addEventListener("click", closeSidePanel);
   document.getElementById("check-conflicts-btn").addEventListener("click", checkConflicts);
+}
+
+function bindActions() {
+  document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
+  document.getElementById("create-schedule-btn").addEventListener("click", () => openSchedulePanel());
+  document.getElementById("schedule-filter-btn").addEventListener("click", applyFilter);
 
   document.querySelectorAll("[data-sched-edit]").forEach((btn) => {
     btn.addEventListener("click", () => startEdit(btn.dataset.schedEdit));
@@ -198,57 +200,11 @@ function bindScheduleActions() {
   });
 }
 
-async function checkConflicts() {
-  const form = document.getElementById("schedule-form");
-  const warningNode = document.getElementById("conflict-warning");
-  warningNode.style.display = "none";
-
-  const payload = buildPayload(new FormData(form));
-  try {
-    validatePayload(payload);
-  } catch (e) {
-    warningNode.textContent = e.message;
-    warningNode.style.display = "";
-    return;
-  }
-
-  try {
-    const result = await apiRequest("/schedules/conflicts", {
-      method: "POST",
-      headers: authHeaders(_token),
-      body: JSON.stringify(payload),
-    });
-    if (result.has_conflict) {
-      warningNode.textContent = "Conflicts detected: " + result.conflicts.join("; ");
-      warningNode.style.display = "";
-    } else {
-      showToast("No conflicts detected. Safe to schedule.", "success");
-    }
-  } catch (e) {
-    warningNode.textContent = e.message;
-    warningNode.style.display = "";
-  }
-}
-
 async function startEdit(id) {
   showLoader("Loading Schedule…");
   try {
     const sched = await apiRequest(`/schedules/${id}`, { headers: authHeaders(_token) });
-    editingId = id;
-    const form = document.getElementById("schedule-form");
-    form.route_id.value = sched.route_id;
-    form.vehicle_id.value = sched.vehicle_id;
-    form.driver_id.value = sched.driver_id;
-    form.departure_time.value = toLocalDatetime(sched.departure_time);
-    form.arrival_time.value = toLocalDatetime(sched.arrival_time);
-    form.status.value = sched.status;
-    form.notes.value = sched.notes || "";
-    document.getElementById("form-mode-text").textContent = "Edit Schedule";
-    document.getElementById("edit-badge").style.display = "";
-    document.getElementById("schedule-submit-btn").textContent = "Save Changes";
-    document.getElementById("schedule-cancel-btn").style.display = "";
-    document.getElementById("status-edit-field").style.display = "";
-    form.scrollIntoView({ behavior: "smooth", block: "start" });
+    openSchedulePanel(sched);
   } catch {
     showToast("Could not load schedule data.", "error");
   } finally {
@@ -256,27 +212,15 @@ async function startEdit(id) {
   }
 }
 
-function resetForm() {
-  editingId = null;
-  document.getElementById("schedule-form").reset();
-  document.getElementById("form-mode-text").textContent = "Create Schedule";
-  document.getElementById("edit-badge").style.display = "none";
-  document.getElementById("schedule-submit-btn").textContent = "Create Schedule";
-  document.getElementById("schedule-cancel-btn").style.display = "none";
-  document.getElementById("status-edit-field").style.display = "none";
-  document.getElementById("schedule-form-error").textContent = "";
-  document.getElementById("conflict-warning").style.display = "none";
-}
-
 function buildPayload(formData) {
-  const departureRaw = formData.get("departure_time");
-  const arrivalRaw = formData.get("arrival_time");
+  const dep = formData.get("departure_time");
+  const arr = formData.get("arrival_time");
   return {
     route_id: formData.get("route_id") || null,
     vehicle_id: formData.get("vehicle_id") || null,
     driver_id: formData.get("driver_id") || null,
-    departure_time: departureRaw ? new Date(departureRaw).toISOString() : null,
-    arrival_time: arrivalRaw ? new Date(arrivalRaw).toISOString() : null,
+    departure_time: dep ? new Date(dep).toISOString() : null,
+    arrival_time: arr ? new Date(arr).toISOString() : null,
     notes: formData.get("notes") || null,
   };
 }
@@ -293,24 +237,42 @@ function validatePayload(payload) {
   }
 }
 
-async function submitScheduleForm(event) {
-  event.preventDefault();
-  const errorNode = document.getElementById("schedule-form-error");
-  errorNode.textContent = "";
-  const formData = new FormData(event.currentTarget);
-  const payload = buildPayload(formData);
-
+async function checkConflicts() {
+  const warningNode = document.getElementById("conflict-warning");
+  warningNode.style.display = "none";
+  const payload = buildPayload(new FormData(document.getElementById("schedule-form")));
   try {
     validatePayload(payload);
   } catch (e) {
-    errorNode.textContent = e.message;
+    warningNode.textContent = e.message;
+    warningNode.style.display = "";
     return;
   }
+  try {
+    const result = await apiRequest("/schedules/conflicts", { method: "POST", headers: authHeaders(_token), body: JSON.stringify(payload) });
+    if (result.has_conflict) {
+      warningNode.textContent = "Conflicts: " + result.conflicts.join("; ");
+      warningNode.style.display = "";
+    } else {
+      showToast("No conflicts detected. Safe to schedule.", "success");
+    }
+  } catch (e) {
+    warningNode.textContent = e.message;
+    warningNode.style.display = "";
+  }
+}
+
+async function submitScheduleForm() {
+  const errorNode = document.getElementById("schedule-form-error");
+  errorNode.textContent = "";
+  const form = document.getElementById("schedule-form");
+  const payload = buildPayload(new FormData(form));
+  try { validatePayload(payload); } catch (e) { errorNode.textContent = e.message; return; }
 
   showLoader(editingId ? "Updating Schedule…" : "Creating Schedule…");
   try {
     if (editingId) {
-      payload.status = formData.get("status");
+      payload.status = new FormData(form).get("status");
       await apiRequest(`/schedules/${editingId}`, { method: "PATCH", headers: authHeaders(_token), body: JSON.stringify(payload) });
       showToast("Schedule updated.");
     } else {
@@ -318,6 +280,7 @@ async function submitScheduleForm(event) {
       await apiRequest("/schedules", { method: "POST", headers: authHeaders(_token), body: JSON.stringify(payload) });
       showToast("Schedule created.");
     }
+    closeSidePanel();
     await loadPage();
   } catch (error) {
     hideLoader();
@@ -338,9 +301,9 @@ async function deleteSchedule(id) {
 }
 
 async function applyFilter() {
-  showLoader("Filtering Schedules…");
+  const status = document.getElementById("status-filter").value;
+  showLoader("Filtering…");
   try {
-    const status = document.getElementById("status-filter").value;
     const url = status ? `/schedules?status=${encodeURIComponent(status)}` : "/schedules";
     const [user, schedules] = await Promise.all([
       fetchCurrentUser(_token),
