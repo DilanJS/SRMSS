@@ -180,3 +180,277 @@ Authorization: Bearer {{access_token}}
 DELETE http://127.0.0.1:8000/routes/{{route_id}}
 Accept: application/json
 Authorization: Bearer {{access_token}}
+
+###
+
+POST http://127.0.0.1:8000/vehicles
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "registration_no": "NB-1234",
+  "fleet_number": "BUS-01",
+  "model": "B9R",
+  "manufacturer": "Volvo",
+  "capacity": 54,
+  "mileage_km": 125000.5,
+  "fuel_type": "diesel",
+  "status": "available",
+  "active": true,
+  "notes": "Primary city bus"
+}
+
+###
+
+GET http://127.0.0.1:8000/vehicles
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/vehicles?search=volvo
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/vehicles/availability
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/vehicles/{{vehicle_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+PATCH http://127.0.0.1:8000/vehicles/{{vehicle_id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "status": "maintenance",
+  "active": false
+}
+
+###
+
+DELETE http://127.0.0.1:8000/vehicles/{{vehicle_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+POST http://127.0.0.1:8000/drivers
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "employee_no": "DRV-01",
+  "full_name": "Kamal Perera",
+  "license_no": "B7654321",
+  "phone_number": "0771234567",
+  "years_of_experience": 8,
+  "working_hours": 42,
+  "status": "available",
+  "active": true,
+  "assigned_route_id": null,
+  "assigned_vehicle_id": null,
+  "hire_date": "2021-03-01",
+  "notes": "Long-distance qualified",
+  "assignment_history": []
+}
+
+###
+
+GET http://127.0.0.1:8000/drivers
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/drivers?search=kamal
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/drivers/availability
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/drivers/{{driver_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+PATCH http://127.0.0.1:8000/drivers/{{driver_id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "status": "assigned",
+  "assigned_vehicle_id": "vehicle-1",
+  "assigned_route_id": "route-1",
+  "assignment_history": [
+    {
+      "route_id": "route-1",
+      "vehicle_id": "vehicle-1",
+      "assigned_at": "2026-06-02T08:00:00+00:00",
+      "released_at": null,
+      "notes": "Morning shift"
+    }
+  ]
+}
+
+###
+
+DELETE http://127.0.0.1:8000/drivers/{{driver_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+POST http://127.0.0.1:8000/schedules
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "route_id": "{{route_id}}",
+  "vehicle_id": "{{vehicle_id}}",
+  "driver_id": "{{driver_id}}",
+  "departure_time": "2026-06-02T08:00:00+00:00",
+  "arrival_time": "2026-06-02T10:00:00+00:00",
+  "status": "scheduled",
+  "emergency_update": false,
+  "notes": "Morning route"
+}
+
+###
+
+POST http://127.0.0.1:8000/schedules/conflicts
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "route_id": "{{route_id}}",
+  "vehicle_id": "{{vehicle_id}}",
+  "driver_id": "{{driver_id}}",
+  "departure_time": "2026-06-02T09:00:00+00:00",
+  "arrival_time": "2026-06-02T11:00:00+00:00",
+  "status": "scheduled",
+  "emergency_update": false
+}
+
+###
+
+GET http://127.0.0.1:8000/schedules
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/schedules/{{schedule_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+PATCH http://127.0.0.1:8000/schedules/{{schedule_id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "status": "active"
+}
+
+###
+
+PATCH http://127.0.0.1:8000/schedules/{{schedule_id}}/emergency
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "departure_time": "2026-06-02T08:30:00+00:00",
+  "arrival_time": "2026-06-02T10:30:00+00:00",
+  "notes": "Traffic disruption"
+}
+
+###
+
+DELETE http://127.0.0.1:8000/schedules/{{schedule_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+GET http://127.0.0.1:8000/dashboard/overview
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+POST http://127.0.0.1:8000/maintenance/fuel-logs
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "vehicle_id": "{{vehicle_id}}",
+  "liters": 120.5,
+  "cost": 35000,
+  "odometer_km": 45200.5,
+  "filled_at": "2026-06-02T07:30:00+00:00",
+  "station_name": "IOC Depot Station",
+  "notes": "Morning top-up"
+}
+
+###
+
+GET http://127.0.0.1:8000/maintenance/fuel-logs?vehicle_id={{vehicle_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+POST http://127.0.0.1:8000/maintenance/maintenance-logs
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "vehicle_id": "{{vehicle_id}}",
+  "service_type": "inspection",
+  "status": "in_progress",
+  "service_date": "2026-06-02",
+  "next_due_date": "2026-07-02",
+  "cost": 15000,
+  "workshop_name": "Main Depot Workshop",
+  "description": "Quarterly inspection"
+}
+
+###
+
+GET http://127.0.0.1:8000/maintenance/maintenance-logs?vehicle_id={{vehicle_id}}
+Accept: application/json
+Authorization: Bearer {{access_token}}
+
+###
+
+PATCH http://127.0.0.1:8000/maintenance/maintenance-logs/{{maintenance_log_id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "status": "completed",
+  "cost": 18000
+}
+
+###
+
+GET http://127.0.0.1:8000/reports/overview
+Accept: application/json
+Authorization: Bearer {{access_token}}
