@@ -54,11 +54,11 @@ function render(user, fuelLogs, maintenanceLogs) {
     content: `
       <section class="dashboard-grid">
         <div class="stats-grid">
-          <article class="stat-card"><span>Fuel Logs</span><strong>${fuelLogs.length}</strong></article>
-          <article class="stat-card"><span>Total Fuel Cost</span><strong>$${totalFuelCost}</strong></article>
-          <article class="stat-card"><span>Maintenance Logs</span><strong>${maintenanceLogs.length}</strong></article>
-          <article class="stat-card"><span>Pending Service</span><strong>${pending}</strong></article>
-          <article class="stat-card"><span>Maint. Cost</span><strong>$${totalMaintCost}</strong></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Fuel Logs</span><strong>${fuelLogs.length}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Total Fuel Cost</span><strong>$${totalFuelCost}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Maintenance Logs</span><strong>${maintenanceLogs.length}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Pending Service</span><strong>${pending}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Maint. Cost</span><strong>$${totalMaintCost}</strong></div></article>
         </div>
         <section class="panel">
           <div class="tab-bar">

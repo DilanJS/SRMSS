@@ -246,8 +246,10 @@ function renderNavItem(item, activeNav, role) {
 function renderStatCard(card) {
   return `
     <article class="stat-card">
-      <span>${card.label}</span>
-      <strong>${card.value}</strong>
+      <div class="stat-card-body">
+        <span>${card.label}</span>
+        <strong>${card.value}</strong>
+      </div>
     </article>
   `;
 }

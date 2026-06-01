@@ -52,20 +52,18 @@ function render(user, report, dateFrom, dateTo) {
         </div>
 
         <div class="stats-grid">
-          <article class="stat-card"><span>Total Routes</span><strong>${s.total_routes}</strong></article>
-          <article class="stat-card"><span>Total Schedules</span><strong>${s.total_schedules}</strong></article>
-          <article class="stat-card"><span>Completed Trips</span><strong>${s.completed_schedules}</strong></article>
-          <article class="stat-card"><span>Total Fuel Cost</span><strong>$${s.total_fuel_cost.toFixed(2)}</strong></article>
-          <article class="stat-card"><span>Maint. Cost</span><strong>$${s.total_maintenance_cost.toFixed(2)}</strong></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Total Routes</span><strong>${s.total_routes}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Total Schedules</span><strong>${s.total_schedules}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Completed Trips</span><strong>${s.completed_schedules}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Total Fuel Cost</span><strong>$${s.total_fuel_cost.toFixed(2)}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Maint. Cost</span><strong>$${s.total_maintenance_cost.toFixed(2)}</strong></div></article>
         </div>
 
         <div class="stats-grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-          <article class="stat-card"><span>Active Schedules</span><strong>${s.active_schedules}</strong></article>
-          <article class="stat-card"><span>Delayed</span><strong>${s.delayed_schedules}</strong></article>
-          <article class="stat-card"><span>Emergency</span><strong>${s.emergency_schedules}</strong></article>
-          <article class="stat-card"><span>Completion Rate</span>
-            <strong>${s.total_schedules ? Math.round((s.completed_schedules / s.total_schedules) * 100) : 0}%</strong>
-          </article>
+          <article class="stat-card"><div class="stat-card-body"><span>Active Schedules</span><strong>${s.active_schedules}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Delayed</span><strong>${s.delayed_schedules}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Emergency</span><strong>${s.emergency_schedules}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Completion Rate</span><strong>${s.total_schedules ? Math.round((s.completed_schedules / s.total_schedules) * 100) : 0}%</strong></div></article>
         </div>
 
         <section class="panel">
