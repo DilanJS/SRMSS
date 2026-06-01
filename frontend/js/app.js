@@ -8,6 +8,7 @@ const PAGE_MODULES = {
   "/schedules": () => import("./schedules-page.js"),
   "/maintenance": () => import("./maintenance-page.js"),
   "/reports": () => import("./reports-page.js"),
+  "/users": () => import("./users-page.js"),
   "/profile": () => import("./profile-page.js"),
 };
 

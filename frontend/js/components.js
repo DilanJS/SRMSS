@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { key: "schedules", label: "Schedules", href: "/frontend/app.html#/schedules" },
   { key: "maintenance", label: "Fuel & Maintenance", href: "/frontend/app.html#/maintenance" },
   { key: "reports", label: "Reports", href: "/frontend/app.html#/reports" },
+  { key: "users", label: "User Management", href: "/frontend/app.html#/users" },
   { key: "profile", label: "My Profile", href: "/frontend/app.html#/profile" },
 ];
 
