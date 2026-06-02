@@ -1,6 +1,8 @@
 const NAV_ITEMS = [
   { key: "dashboard",   label: "Dashboard",          href: "/frontend/app.html#/dashboard",   roles: ["admin", "manager"] },
   { key: "routes",      label: "Routes",              href: "/frontend/app.html#/routes",      roles: ["admin", "manager", "driver", "user"] },
+  { key: "tracking",        label: "Live Tracking",  href: "/frontend/app.html#/tracking",        roles: ["admin", "manager"] },
+  { key: "driver-tracker",  label: "Start Tracking", href: "/frontend/app.html#/driver-tracker",  roles: ["driver"] },
   { key: "vehicles",    label: "Vehicles",            href: "/frontend/app.html#/vehicles",    roles: ["admin", "manager"] },
   { key: "drivers",     label: "Drivers",             href: "/frontend/app.html#/drivers",     roles: ["admin", "manager"] },
   { key: "schedules",   label: "Schedules",           href: "/frontend/app.html#/schedules",   roles: ["admin", "manager", "driver"] },
@@ -14,35 +16,39 @@ export function renderLoginForm() {
   return `
     <section class="auth-layout">
       <div class="auth-hero">
-        <div>
-          <span class="eyebrow">Smart Route Operations</span>
-          <h1 class="auth-title">Operate the depot from one decisive control room.</h1>
-          <p class="auth-copy">
-            SRMSS brings schedules, fleet health, route coverage, and operational reporting
-            into one live workspace for depot administrators and managers.
-          </p>
-          <div class="hero-stats">
-            <div class="hero-stat"><strong>8</strong><span>Core modules aligned to the project plan.</span></div>
-            <div class="hero-stat"><strong>Live</strong><span>Backend modules already connected to Firebase or local fallback.</span></div>
-            <div class="hero-stat"><strong>1</strong><span>Shared system entry for admin and management teams.</span></div>
+        <div class="auth-hero-content">
+          <div class="auth-brand-mark">
+            <div class="auth-brand-icon">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <path d="M14 2L26 8v12L14 26 2 20V8L14 2z" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+                <path d="M14 7l8 4v6l-8 4-8-4v-6l8-4z" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
+              </svg>
+            </div>
+            <span class="auth-brand-name">SRMSS</span>
+          </div>
+          <h1 class="auth-title">Smart Route<br>Management</h1>
+          <p class="auth-copy">Fleet operations, live tracking, and route management for depot teams.</p>
+          <div class="auth-feature-list">
+            <div class="auth-feature"><span class="auth-feature-dot"></span>Live vehicle GPS tracking</div>
+            <div class="auth-feature"><span class="auth-feature-dot"></span>Route & schedule management</div>
+            <div class="auth-feature"><span class="auth-feature-dot"></span>Fleet maintenance & reporting</div>
           </div>
         </div>
       </div>
       <div class="auth-panel">
         <section class="auth-card">
           <h2>Sign In</h2>
-          <p>Use your SRMSS account to access the protected operations dashboard.</p>
           <form id="login-form" class="form-grid">
             <div class="field">
               <label for="email">Email</label>
-              <input id="email" name="email" type="email" placeholder="admin@srmss.local" required>
+              <input id="email" name="email" type="email" placeholder="you@srmss.local" required autocomplete="email">
             </div>
             <div class="field">
               <label for="password">Password</label>
-              <input id="password" name="password" type="password" placeholder="Enter your password" required>
+              <input id="password" name="password" type="password" placeholder="Password" required autocomplete="current-password">
             </div>
             <div class="error-text" id="login-error"></div>
-            <button class="primary-btn" id="login-submit" type="submit">Enter Dashboard</button>
+            <button class="primary-btn" id="login-submit" type="submit">Sign In</button>
           </form>
         </section>
       </div>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>SRMSS Driver Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/frontend/css/styles.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Manrope', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+    .tracker-shell {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 20px 16px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 100vh;
+    }
+
+    .tracker-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 0 4px;
+    }
+
+    .tracker-brand strong { font-size: 18px; color: #f1f5f9; }
+    .tracker-brand span { font-size: 12px; color: #64748b; }
+
+    .tracker-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .tracker-card h2 { font-size: 15px; color: #94a3b8; margin-bottom: 14px; }
+
+    .tracker-field { margin-bottom: 12px; }
+    .tracker-field label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+    .tracker-field input,
+    .tracker-field select {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .tracker-field input:focus,
+    .tracker-field select:focus { outline: none; border-color: #6366f1; }
+
+    .tracker-error { color: #f87171; font-size: 13px; margin-top: 6px; display: none; }
+
+    .tracker-btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.15s;
+    }
+    .tracker-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .tracker-btn-primary { background: #6366f1; color: #fff; }
+    .tracker-btn-danger  { background: #ef4444; color: #fff; }
+    .tracker-btn-ghost   { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+    .status-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #334155;
+      font-size: 13px;
+    }
+    .status-row:last-child { border-bottom: none; }
+    .status-row .label { color: #64748b; }
+    .status-row .value { color: #e2e8f0; font-weight: 600; }
+    .status-row .value.good { color: #22c55e; }
+    .status-row .value.warn { color: #f59e0b; }
+    .status-row .value.bad  { color: #ef4444; }
+
+    .pulse-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      margin-right: 6px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    #tracker-mini-map {
+      height: 200px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      overflow: hidden;
+    }
+
+    #login-section, #tracker-section { display: none; }
+    #login-section.active, #tracker-section.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="tracker-shell">
+    <div class="tracker-brand">
+      <div>
+        <strong>SRMSS</strong>
+        <span> Driver Tracker</span>
+      </div>
+    </div>
+
+    <!-- Login -->
+    <div id="login-section">
+      <div class="tracker-card">
+        <h2>Sign In</h2>
+        <div class="tracker-field">
+          <label>Email</label>
+          <input type="email" id="login-email" placeholder="driver@srmss.local" autocomplete="email">
+        </div>
+        <div class="tracker-field">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+        </div>
+        <div class="tracker-error" id="login-error"></div>
+        <button class="tracker-btn tracker-btn-primary" id="login-btn" style="margin-top:8px">Sign In</button>
+      </div>
+    </div>
+
+    <!-- Tracker -->
+    <div id="tracker-section">
+      <div class="tracker-card" id="vehicle-select-card">
+        <h2>Select Your Vehicle</h2>
+        <div class="tracker-field">
+          <label>Vehicle</label>
+          <select id="vehicle-select">
+            <option value="">Loading vehicles…</option>
+          </select>
+        </div>
+        <button class="tracker-btn tracker-btn-primary" id="start-btn" disabled>Start Tracking</button>
+      </div>
+
+      <div class="status-card" id="status-card" style="display:none">
+        <div class="status-row">
+          <span class="label">Status</span>
+          <span class="value good" id="status-tracking"><span class="pulse-dot"></span>Reporting</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Vehicle</span>
+          <span class="value" id="status-vehicle">—</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Coordinates</span>
+          <span class="value" id="status-coords">Acquiring…</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Speed</span>
+          <span class="value" id="status-speed">—</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Accuracy</span>
+          <span class="value" id="status-accuracy">—</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Last sent</span>
+          <span class="value" id="status-last-sent">—</span>
+        </div>
+      </div>
+
+      <div id="tracker-mini-map" style="display:none"></div>
+
+      <button class="tracker-btn tracker-btn-danger" id="stop-btn" style="display:none">Stop Tracking</button>
+      <button class="tracker-btn tracker-btn-ghost" id="logout-tracker-btn">Sign Out</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/frontend/js/tracker.js"></script>
+</body>
+</html>

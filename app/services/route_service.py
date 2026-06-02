@@ -83,8 +83,6 @@ class LocalRouteService:
             updates = payload.model_dump(exclude_unset=True)
             if "route_code" in updates and updates["route_code"] != existing["route_code"]:
                 self._ensure_unique_route_code(routes, updates["route_code"], exclude_route_id=route_id)
-            if "stops" in updates and updates["stops"] is not None:
-                updates["stops"] = [stop.model_dump() for stop in updates["stops"]]
             if "path_points" in updates and updates["path_points"] is not None:
                 updates["path_points"] = [list(point) for point in updates["path_points"]]
             updates["updated_at"] = _utc_now().isoformat()
@@ -229,8 +227,6 @@ class FirebaseRouteService:
         updates = payload.model_dump(exclude_unset=True)
         if "route_code" in updates and updates["route_code"] != existing["route_code"]:
             self._ensure_unique_route_code(routes, updates["route_code"], exclude_route_id=route_id)
-        if "stops" in updates and updates["stops"] is not None:
-            updates["stops"] = [stop.model_dump() for stop in updates["stops"]]
         if "path_points" in updates and updates["path_points"] is not None:
             updates["path_points"] = [list(point) for point in updates["path_points"]]
         updates["updated_at"] = _utc_now().isoformat()

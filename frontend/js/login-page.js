@@ -50,6 +50,6 @@ form.addEventListener("submit", async (event) => {
     errorNode.textContent = error.message;
   } finally {
     submitButton.disabled = false;
-    submitButton.textContent = "Enter Dashboard";
+    submitButton.textContent = "Sign In";
   }
 });
