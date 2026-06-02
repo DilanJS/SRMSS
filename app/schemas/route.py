@@ -18,7 +18,11 @@ class RouteBase(BaseModel):
     route_code: str = Field(min_length=2, max_length=30)
     route_name: str = Field(min_length=3, max_length=120)
     start_point: str = Field(min_length=2, max_length=100)
+    start_latitude: float | None = Field(default=None, ge=-90, le=90)
+    start_longitude: float | None = Field(default=None, ge=-180, le=180)
     end_point: str = Field(min_length=2, max_length=100)
+    end_latitude: float | None = Field(default=None, ge=-90, le=90)
+    end_longitude: float | None = Field(default=None, ge=-180, le=180)
     distance_km: float = Field(gt=0, le=5000)
     estimated_duration_minutes: int = Field(gt=0, le=10080)
     service_type: ServiceType
@@ -56,7 +60,11 @@ class RouteUpdateRequest(BaseModel):
     route_code: str | None = Field(default=None, min_length=2, max_length=30)
     route_name: str | None = Field(default=None, min_length=3, max_length=120)
     start_point: str | None = Field(default=None, min_length=2, max_length=100)
+    start_latitude: float | None = Field(default=None, ge=-90, le=90)
+    start_longitude: float | None = Field(default=None, ge=-180, le=180)
     end_point: str | None = Field(default=None, min_length=2, max_length=100)
+    end_latitude: float | None = Field(default=None, ge=-90, le=90)
+    end_longitude: float | None = Field(default=None, ge=-180, le=180)
     distance_km: float | None = Field(default=None, gt=0, le=5000)
     estimated_duration_minutes: int | None = Field(default=None, gt=0, le=10080)
     service_type: ServiceType | None = None
@@ -98,7 +106,11 @@ class RouteMapResponse(BaseModel):
     route_code: str
     route_name: str
     start_point: str
+    start_latitude: float | None
+    start_longitude: float | None
     end_point: str
+    end_latitude: float | None
+    end_longitude: float | None
     stops: list[RouteStop]
     path_points: list[tuple[float, float]]
 
