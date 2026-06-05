@@ -859,6 +859,98 @@ body {
 .route-map-pin-stop  { background: #3b82f6; }
 .route-map-pin-end   { background: #ef4444; }
 
+/* ── Assignment panel ── */
+.assign-route-info {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  display: grid;
+  gap: 6px;
+}
+.assign-info-row {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+}
+.assign-label {
+  color: var(--text-soft);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+.assign-value { color: var(--text); font-weight: 500; }
+
+.current-assignment-banner {
+  background: var(--blue-faint);
+  border: 1px solid var(--blue-light);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.current-assign-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--blue);
+  margin-bottom: 6px;
+}
+.current-assign-detail { font-size: 13px; color: var(--text-soft); line-height: 1.7; }
+
+.assign-field-hint { font-size: 11px; color: var(--text-faint); font-weight: 400; }
+.assign-empty-note { font-size: 13px; color: var(--text-faint); font-style: italic; margin: 4px 0 0; }
+
+/* ── Recurring schedule ── */
+.recurring-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  user-select: none;
+}
+.recurring-toggle-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--blue); }
+
+.recurring-section {
+  background: var(--blue-faint);
+  border: 1px solid var(--blue-light);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.weekday-checkboxes { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.weekday-chip { display: inline-block; cursor: pointer; user-select: none; }
+.weekday-chip input { display: none; }
+.weekday-chip span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-panel);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.weekday-chip input:checked + span {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.assignment-cell { display: flex; flex-direction: column; gap: 2px; }
+.assignment-vehicle { font-size: 12px; font-weight: 600; color: var(--text); }
+.assignment-driver  { font-size: 11px; color: var(--text-soft); }
+
 /* ═══════════════════════════════════════════
    BADGES
    ═══════════════════════════════════════════ */
@@ -1035,6 +1127,21 @@ body {
 }
 
 .date-filter-bar .field { flex: 1; min-width: 160px; }
+
+.reports-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.reports-toolbar .date-filter-bar { flex: 1; margin-bottom: 0; }
+
+.export-pdf-btn {
+  flex-shrink: 0;
+  align-self: flex-end;
+  white-space: nowrap;
+}
 
 .report-section { margin-bottom: 24px; }
 .report-section h4 {
@@ -1641,8 +1748,10 @@ body {
 
   .data-table th, .data-table td { padding: 9px 10px; font-size: 13px; }
 
+  .reports-toolbar { flex-direction: column; }
   .date-filter-bar { flex-direction: column; gap: 10px; }
   .date-filter-bar .field { width: 100%; }
+  .export-pdf-btn { width: 100%; justify-content: center; }
 
   .side-panel { width: 100vw; }
   .side-panel-footer { flex-direction: column; }

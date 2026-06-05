@@ -161,6 +161,39 @@ function buildFormHTML(sched = null) {
         <label>Notes (optional)</label>
         <input name="notes" type="text" maxlength="500" value="${v("notes") || ""}">
       </div>
+      ${!sched ? `
+        <div class="field">
+          <label class="recurring-toggle-label">
+            <input type="checkbox" id="recurring-toggle">
+            <span>Repeat this schedule</span>
+          </label>
+        </div>
+        <div id="recurring-options" class="recurring-section" style="display:none">
+          <div class="field">
+            <label>Recurrence Pattern</label>
+            <select name="recurrence" id="recurrence-pattern">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly (same day each month)</option>
+            </select>
+          </div>
+          <div class="field" id="recurrence-days-field" style="display:none">
+            <label>Days of Week</label>
+            <div class="weekday-checkboxes">
+              ${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day, i) => `
+                <label class="weekday-chip">
+                  <input type="checkbox" name="recurrence_day" value="${i}">
+                  <span>${day}</span>
+                </label>
+              `).join("")}
+            </div>
+          </div>
+          <div class="field">
+            <label>Repeat Until</label>
+            <input type="date" name="repeat_until" id="repeat-until">
+          </div>
+        </div>
+      ` : ""}
       <div id="conflict-warning" class="error-text" style="display:none"></div>
       ${renderInlineError("schedule-form-error")}
     </form>
@@ -182,6 +215,18 @@ function openSchedulePanel(sched = null) {
   document.getElementById("schedule-panel-submit").addEventListener("click", submitScheduleForm);
   document.getElementById("schedule-panel-cancel").addEventListener("click", closeSidePanel);
   document.getElementById("check-conflicts-btn").addEventListener("click", checkConflicts);
+
+  if (!sched) {
+    document.getElementById("recurring-toggle").addEventListener("change", (e) => {
+      document.getElementById("recurring-options").style.display = e.target.checked ? "" : "none";
+      document.getElementById("schedule-panel-submit").textContent =
+        e.target.checked ? "Create Recurring Schedules" : "Create Schedule";
+    });
+    document.getElementById("recurrence-pattern").addEventListener("change", (e) => {
+      document.getElementById("recurrence-days-field").style.display =
+        e.target.value === "weekly" ? "" : "none";
+    });
+  }
 }
 
 function bindActions() {
@@ -270,13 +315,54 @@ async function submitScheduleForm() {
   const errorNode = document.getElementById("schedule-form-error");
   errorNode.textContent = "";
   const form = document.getElementById("schedule-form");
-  const payload = buildPayload(new FormData(form));
+  const formData = new FormData(form);
+  const payload = buildPayload(formData);
   try { validatePayload(payload); } catch (e) { errorNode.textContent = e.message; return; }
+
+  const isRecurring = !editingId && document.getElementById("recurring-toggle")?.checked;
+
+  if (isRecurring) {
+    const recurrence = formData.get("recurrence");
+    const repeatUntil = formData.get("repeat_until");
+    const recurrenceDays = recurrence === "weekly"
+      ? [...form.querySelectorAll('[name="recurrence_day"]:checked')].map(el => parseInt(el.value))
+      : [];
+
+    if (!repeatUntil) { errorNode.textContent = "Please set a Repeat Until date."; return; }
+    if (recurrence === "weekly" && recurrenceDays.length === 0) {
+      errorNode.textContent = "Please select at least one day of the week."; return;
+    }
+
+    payload.status = "scheduled";
+    payload.recurrence = recurrence;
+    payload.recurrence_days = recurrenceDays;
+    payload.repeat_until = repeatUntil;
+
+    showLoader("Creating Recurring Schedules…");
+    try {
+      const result = await apiRequest("/schedules/recurring", {
+        method: "POST",
+        headers: authHeaders(_token),
+        body: JSON.stringify(payload),
+      });
+      closeSidePanel();
+      await loadPage();
+      if (result.skipped > 0) {
+        showToast(`${result.created} schedule(s) created. ${result.skipped} skipped (conflicts).`, "info");
+      } else {
+        showToast(`${result.created} recurring schedule(s) created.`);
+      }
+    } catch (error) {
+      hideLoader();
+      errorNode.textContent = error.message;
+    }
+    return;
+  }
 
   showLoader(editingId ? "Updating Schedule…" : "Creating Schedule…");
   try {
     if (editingId) {
-      payload.status = new FormData(form).get("status");
+      payload.status = formData.get("status");
       await apiRequest(`/schedules/${editingId}`, { method: "PATCH", headers: authHeaders(_token), body: JSON.stringify(payload) });
       showToast("Schedule updated.");
     } else {

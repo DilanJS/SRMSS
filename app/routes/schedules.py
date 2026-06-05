@@ -6,6 +6,8 @@ from app.routes.auth import get_current_user, require_roles
 from app.schemas.auth import MessageResponse, UserResponse
 from app.schemas.schedule import (
     EmergencyScheduleUpdateRequest,
+    RecurringScheduleRequest,
+    RecurringScheduleResponse,
     ScheduleConflictResponse,
     ScheduleCreateRequest,
     ScheduleListQuery,
@@ -23,6 +25,14 @@ def create_schedule(
     current_user: Annotated[UserResponse, Depends(require_roles("admin", "manager"))],
 ) -> ScheduleResponse:
     return schedule_manager.create_schedule(payload, created_by=current_user.id)
+
+
+@router.post("/recurring", response_model=RecurringScheduleResponse, status_code=status.HTTP_201_CREATED)
+def create_recurring_schedules(
+    payload: RecurringScheduleRequest,
+    current_user: Annotated[UserResponse, Depends(require_roles("admin", "manager"))],
+) -> RecurringScheduleResponse:
+    return schedule_manager.create_recurring_schedules(payload, created_by=current_user.id)
 
 
 @router.post("/conflicts", response_model=ScheduleConflictResponse)

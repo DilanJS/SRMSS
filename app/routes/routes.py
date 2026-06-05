@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 from app.routes.auth import get_current_user, require_roles
 from app.schemas.auth import MessageResponse, UserResponse
 from app.schemas.route import (
+    RouteAssignRequest,
     RouteCreateRequest,
     RouteListQuery,
     RouteMapResponse,
@@ -59,6 +60,23 @@ def update_route(
     _: Annotated[UserResponse, Depends(require_roles("admin", "manager"))],
 ) -> RouteResponse:
     return route_manager.update_route(route_id, payload)
+
+
+@router.post("/{route_id}/assign", response_model=RouteResponse)
+def assign_route(
+    route_id: str,
+    payload: RouteAssignRequest,
+    _: Annotated[UserResponse, Depends(require_roles("admin", "manager"))],
+) -> RouteResponse:
+    return route_manager.assign_route(route_id, payload.vehicle_id, payload.driver_id)
+
+
+@router.delete("/{route_id}/assign", response_model=RouteResponse)
+def unassign_route(
+    route_id: str,
+    _: Annotated[UserResponse, Depends(require_roles("admin", "manager"))],
+) -> RouteResponse:
+    return route_manager.unassign_route(route_id)
 
 
 @router.delete("/{route_id}", response_model=MessageResponse)

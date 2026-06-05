@@ -1,5 +1,7 @@
+import calendar
 import json
-from datetime import datetime, timezone
+from datetime import date as date_type
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -11,6 +13,8 @@ from app.config import get_settings
 from app.firebase_config import get_firebase_db
 from app.schemas.schedule import (
     EmergencyScheduleUpdateRequest,
+    RecurringScheduleRequest,
+    RecurringScheduleResponse,
     ScheduleConflictResponse,
     ScheduleCreateRequest,
     ScheduleListQuery,
@@ -138,6 +142,80 @@ class LocalScheduleService:
             arrival_time=payload.arrival_time,
         )
         return ScheduleConflictResponse(has_conflict=bool(conflicts), conflicts=conflicts)
+
+    def create_recurring_schedules(
+        self, payload: RecurringScheduleRequest, created_by: str
+    ) -> RecurringScheduleResponse:
+        self._validate_references(payload.route_id, payload.vehicle_id, payload.driver_id)
+        occurrences = self._generate_occurrences(
+            departure=payload.departure_time,
+            arrival=payload.arrival_time,
+            recurrence=payload.recurrence,
+            recurrence_days=payload.recurrence_days,
+            repeat_until=payload.repeat_until,
+        )
+        created = 0
+        skipped = 0
+        skipped_dates: list[str] = []
+        for dep, arr in occurrences:
+            single = ScheduleCreateRequest(
+                route_id=payload.route_id,
+                vehicle_id=payload.vehicle_id,
+                driver_id=payload.driver_id,
+                departure_time=dep,
+                arrival_time=arr,
+                notes=payload.notes,
+            )
+            try:
+                self.create_schedule(single, created_by)
+                created += 1
+            except HTTPException as exc:
+                if exc.status_code == status.HTTP_409_CONFLICT:
+                    skipped += 1
+                    skipped_dates.append(dep.strftime("%Y-%m-%d %H:%M"))
+                else:
+                    raise
+        return RecurringScheduleResponse(created=created, skipped=skipped, skipped_dates=skipped_dates)
+
+    def _generate_occurrences(
+        self,
+        departure: datetime,
+        arrival: datetime,
+        recurrence: str,
+        recurrence_days: list[int],
+        repeat_until: date_type,
+    ) -> list[tuple[datetime, datetime]]:
+        duration = arrival - departure
+        occurrences: list[tuple[datetime, datetime]] = []
+        current = departure.date()
+
+        if recurrence == "daily":
+            while current <= repeat_until:
+                dep = departure.replace(year=current.year, month=current.month, day=current.day)
+                occurrences.append((dep, dep + duration))
+                current += timedelta(days=1)
+
+        elif recurrence == "weekly":
+            days_set = set(recurrence_days)
+            while current <= repeat_until:
+                if current.weekday() in days_set:
+                    dep = departure.replace(year=current.year, month=current.month, day=current.day)
+                    occurrences.append((dep, dep + duration))
+                current += timedelta(days=1)
+
+        elif recurrence == "monthly":
+            while current <= repeat_until:
+                dep = departure.replace(year=current.year, month=current.month, day=current.day)
+                occurrences.append((dep, dep + duration))
+                month = current.month + 1
+                year = current.year
+                if month > 12:
+                    month = 1
+                    year += 1
+                max_day = calendar.monthrange(year, month)[1]
+                current = date_type(year, month, min(departure.day, max_day))
+
+        return occurrences
 
     def _read_schedules(self) -> dict[str, Any]:
         raw = self._schedules_path.read_text(encoding="utf-8").strip()
@@ -318,6 +396,11 @@ class ScheduleManager:
 
     def create_schedule(self, payload: ScheduleCreateRequest, created_by: str) -> ScheduleResponse:
         return self.provider.create_schedule(payload, created_by)
+
+    def create_recurring_schedules(
+        self, payload: RecurringScheduleRequest, created_by: str
+    ) -> RecurringScheduleResponse:
+        return self.provider.create_recurring_schedules(payload, created_by)
 
     def list_schedules(self, query: ScheduleListQuery) -> list[ScheduleResponse]:
         return self.provider.list_schedules(query)
