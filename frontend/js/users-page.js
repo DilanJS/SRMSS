@@ -1,6 +1,8 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, renderPagination, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
+
+const PAGE_SIZE = 15;
 
 // Roles defined by the system plan
 const ROLES = [
@@ -12,33 +14,42 @@ const ROLES = [
 
 let _container, _token, _currentUserId;
 let editingId = null;
+let _page = 1, _totalPages = 1, _total = 0, _summary = {};
+let _searchQuery = "";
+let _roleFilter = "";
 
 export async function mount(container, token) {
   _container = container;
   _token = token;
   editingId = null;
+  _page = 1;
+  _searchQuery = "";
+  _roleFilter = "";
   await loadPage();
 }
 
 async function loadPage() {
   showLoader("Loading Users…");
   try {
-    const [me, users] = await Promise.all([
+    const params = new URLSearchParams({ page: _page, page_size: PAGE_SIZE });
+    if (_searchQuery) params.set("search", _searchQuery);
+    if (_roleFilter) params.set("role", _roleFilter);
+    const [me, result] = await Promise.all([
       fetchCurrentUser(_token),
-      apiRequest("/auth/users", { headers: authHeaders(_token) }),
+      apiRequest(`/auth/users?${params}`, { headers: authHeaders(_token) }),
     ]);
     _currentUserId = me.id;
-    render(me, users);
+    _total = result.total;
+    _totalPages = result.total_pages;
+    _page = result.page;
+    _summary = result.summary;
+    render(me, result.items);
   } catch (e) {
     hideLoader();
     showToast(e.message || "Failed to load users. Admin access required.", "error");
   } finally {
     hideLoader();
   }
-}
-
-function roleCount(users, role) {
-  return users.filter((u) => u.role === role).length;
 }
 
 function render(me, users) {
@@ -48,17 +59,17 @@ function render(me, users) {
     title: "User Management",
     subtitle: "Create and manage system user accounts with predefined role-based access.",
     statsCards: [
-      { label: "Total Users", value: users.length },
-      { label: "Admins", value: roleCount(users, "admin") },
-      { label: "Managers", value: roleCount(users, "manager") },
-      { label: "Drivers", value: roleCount(users, "driver") },
-      { label: "Users", value: roleCount(users, "user") },
+      { label: "Total Users", value: _total },
+      { label: "Admins", value: _summary.admin ?? 0 },
+      { label: "Managers", value: _summary.manager ?? 0 },
+      { label: "Drivers", value: _summary.driver ?? 0 },
+      { label: "Users", value: _summary.user ?? 0 },
     ],
     filterMarkup: renderFilters(`
-      <input class="filter-input" id="user-search" placeholder="Search name or email">
+      <input class="filter-input" id="user-search" placeholder="Search name or email" value="${_searchQuery}">
       <select class="filter-input" id="role-filter" style="max-width:160px">
         <option value="">All Roles</option>
-        ${ROLES.map((r) => `<option value="${r.value}">${r.label}</option>`).join("")}
+        ${ROLES.map((r) => `<option value="${r.value}" ${_roleFilter === r.value ? "selected" : ""}>${r.label}</option>`).join("")}
       </select>
       <button class="ghost-btn" id="user-filter-btn" type="button">Filter</button>
       <button class="primary-btn" id="create-user-btn" type="button">+ New User</button>
@@ -87,7 +98,7 @@ function render(me, users) {
         </tr>
       `),
       emptyMessage: "No users found.",
-    }),
+    }) + renderPagination({ page: _page, totalPages: _totalPages, total: _total, pageSize: PAGE_SIZE }),
   });
 
   bindActions();
@@ -184,6 +195,13 @@ function bindActions() {
       });
     });
   });
+
+  document.querySelectorAll(".pagination [data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _page = parseInt(btn.dataset.page);
+      loadPage();
+    });
+  });
 }
 
 async function startEdit(id) {
@@ -248,23 +266,10 @@ async function deleteUser(id) {
 }
 
 async function applyFilter() {
-  const search = document.getElementById("user-search").value.trim().toLowerCase();
-  const role = document.getElementById("role-filter").value;
-  showLoader("Filtering…");
-  try {
-    const [me, users] = await Promise.all([
-      fetchCurrentUser(_token),
-      apiRequest("/auth/users", { headers: authHeaders(_token) }),
-    ]);
-    const filtered = users.filter((u) => {
-      const matchesSearch = !search || u.full_name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search);
-      const matchesRole = !role || u.role === role;
-      return matchesSearch && matchesRole;
-    });
-    render(me, filtered);
-  } finally {
-    hideLoader();
-  }
+  _searchQuery = document.getElementById("user-search").value.trim();
+  _roleFilter = document.getElementById("role-filter").value;
+  _page = 1;
+  await loadPage();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

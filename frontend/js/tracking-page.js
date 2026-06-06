@@ -30,13 +30,16 @@ function _cleanup() {
 async function loadPage() {
   showLoader("Loading Tracking…");
   try {
-    const [user, vehicles, routes, schedules, fbConfig] = await Promise.all([
+    const [user, vehiclesResult, routesResult, schedulesResult, fbConfig] = await Promise.all([
       fetchCurrentUser(_token),
-      apiRequest("/vehicles", { headers: authHeaders(_token) }),
-      apiRequest("/routes", { headers: authHeaders(_token) }),
-      apiRequest("/schedules?status=active", { headers: authHeaders(_token) }).catch(() => []),
+      apiRequest("/vehicles?page=1&page_size=1000", { headers: authHeaders(_token) }),
+      apiRequest("/routes?page=1&page_size=1000", { headers: authHeaders(_token) }),
+      apiRequest("/schedules?status=active&page=1&page_size=1000", { headers: authHeaders(_token) }).catch(() => ({ items: [] })),
       fetch("/api/firebase-config").then(r => r.json()),
     ]);
+    const vehicles = vehiclesResult.items;
+    const routes = routesResult.items;
+    const schedules = schedulesResult.items;
 
     // Build lookup indexes
     _vehicleIndex = Object.fromEntries(vehicles.map(v => [v.id, v]));

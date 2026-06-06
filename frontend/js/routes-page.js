@@ -1,11 +1,15 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, renderPagination, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
+
+const PAGE_SIZE = 15;
 
 let _container, _token, _role;
 let editingId = null;
 let _vehicles = [];
 let _drivers = [];
+let _page = 1, _totalPages = 1, _total = 0, _summary = {};
+let _searchQuery = "";
 
 // Intermediate stops state
 let _stops = [];
@@ -25,6 +29,8 @@ export async function mount(container, token) {
   _token = token;
   _role = null;
   editingId = null;
+  _page = 1;
+  _searchQuery = "";
   await loadPage();
 }
 
@@ -36,36 +42,40 @@ async function loadPage() {
   try {
     const user = await fetchCurrentUser(_token);
     _role = user.role;
-    const [routes, vehicles, drivers] = await Promise.all([
-      apiRequest("/routes", { headers: authHeaders(_token) }),
-      apiRequest("/vehicles", { headers: authHeaders(_token) }),
-      apiRequest("/drivers", { headers: authHeaders(_token) }),
+    const routeParams = new URLSearchParams({ page: _page, page_size: PAGE_SIZE });
+    if (_searchQuery) routeParams.set("search", _searchQuery);
+    const [routeResult, vehiclesResult, driversResult] = await Promise.all([
+      apiRequest(`/routes?${routeParams}`, { headers: authHeaders(_token) }),
+      apiRequest("/vehicles?page=1&page_size=1000", { headers: authHeaders(_token) }),
+      apiRequest("/drivers?page=1&page_size=1000", { headers: authHeaders(_token) }),
     ]);
-    _vehicles = vehicles;
-    _drivers = drivers;
-    render(user, routes);
+    _total = routeResult.total;
+    _totalPages = routeResult.total_pages;
+    _page = routeResult.page;
+    _summary = routeResult.summary;
+    _vehicles = vehiclesResult.items;
+    _drivers = driversResult.items;
+    render(user, routeResult.items);
   } finally {
     hideLoader();
   }
 }
 
 function render(user, routes) {
-  const activeRoutes = routes.filter((r) => r.active).length;
-
   _container.innerHTML = renderManagementPage({
     user,
     activeNav: "routes",
     title: "Route Management",
     subtitle: "Define, review, and refine route coverage for depot operations.",
     statsCards: [
-      { label: "Total Routes", value: routes.length },
-      { label: "Active Routes", value: activeRoutes },
-      { label: "Inactive Routes", value: routes.length - activeRoutes },
-      { label: "Express Routes", value: routes.filter((r) => r.service_type === "express").length },
-      { label: "City Routes", value: routes.filter((r) => r.service_type === "city").length },
+      { label: "Total Routes", value: _total },
+      { label: "Active Routes", value: _summary.active ?? 0 },
+      { label: "Inactive Routes", value: _summary.inactive ?? 0 },
+      { label: "Express Routes", value: _summary.express ?? 0 },
+      { label: "City Routes", value: _summary.city ?? 0 },
     ],
     filterMarkup: renderFilters(`
-      <input class="filter-input" id="route-search" placeholder="Search route code or name">
+      <input class="filter-input" id="route-search" placeholder="Search route code or name" value="${_searchQuery}">
       <button class="ghost-btn" id="route-search-btn" type="button">Search</button>
       ${isAdmin() ? `<button class="primary-btn" id="create-route-btn" type="button">+ New Route</button>` : ""}
     `),
@@ -99,7 +109,7 @@ function render(user, routes) {
         `;
       }),
       emptyMessage: "No routes yet. Click + New Route to create one.",
-    }),
+    }) + renderPagination({ page: _page, totalPages: _totalPages, total: _total, pageSize: PAGE_SIZE }),
   });
 
   bindActions();
@@ -468,6 +478,13 @@ function bindActions() {
       });
     });
   });
+
+  document.querySelectorAll(".pagination [data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _page = parseInt(btn.dataset.page);
+      loadPage();
+    });
+  });
 }
 
 async function startEdit(id) {
@@ -709,15 +726,7 @@ async function deleteRoute(id) {
 }
 
 async function applyRouteSearch() {
-  const search = document.getElementById("route-search").value.trim();
-  showLoader("Searching…");
-  try {
-    const [user, routes] = await Promise.all([
-      fetchCurrentUser(_token),
-      apiRequest(search ? `/routes?search=${encodeURIComponent(search)}` : "/routes", { headers: authHeaders(_token) }),
-    ]);
-    render(user, routes);
-  } finally {
-    hideLoader();
-  }
+  _searchQuery = document.getElementById("route-search").value.trim();
+  _page = 1;
+  await loadPage();
 }

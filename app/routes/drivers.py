@@ -1,9 +1,11 @@
+from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
 from app.routes.auth import get_current_user, require_roles
 from app.schemas.auth import MessageResponse, UserResponse
+from app.schemas.common import PaginatedResponse, paginate
 from app.schemas.driver import (
     DriverAvailabilityResponse,
     DriverCreateRequest,
@@ -24,16 +26,32 @@ def create_driver(
     return driver_manager.create_driver(payload, created_by=current_user.id)
 
 
-@router.get("", response_model=list[DriverResponse])
+@router.get("", response_model=PaginatedResponse[DriverResponse])
 def list_drivers(
     current_user: Annotated[UserResponse, Depends(get_current_user)],
     status_filter: str | None = Query(default=None, alias="status"),
     active: bool | None = Query(default=None),
     search: str | None = Query(default=None, min_length=1),
-) -> list[DriverResponse]:
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=15, ge=1, le=1000),
+) -> PaginatedResponse[DriverResponse]:
     del current_user
     query = DriverListQuery(status=status_filter, active=active, search=search)
-    return driver_manager.list_drivers(query)
+    all_items = driver_manager.list_drivers(query)
+    today = date.today()
+    cutoff_30 = today + timedelta(days=30)
+    summary = {
+        "active": sum(1 for d in all_items if d.status == "active"),
+        "assigned": sum(1 for d in all_items if d.status == "assigned"),
+        "expired_licenses": sum(
+            1 for d in all_items if d.license_expiry_date and d.license_expiry_date < today
+        ),
+        "expiring_licenses": sum(
+            1 for d in all_items
+            if d.license_expiry_date and today <= d.license_expiry_date <= cutoff_30
+        ),
+    }
+    return paginate(all_items, page, page_size, summary)
 
 
 @router.get("/availability", response_model=DriverAvailabilityResponse)

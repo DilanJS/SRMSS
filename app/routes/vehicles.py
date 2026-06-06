@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.routes.auth import get_current_user, require_roles
 from app.schemas.auth import MessageResponse, UserResponse
+from app.schemas.common import PaginatedResponse, paginate
 from app.schemas.vehicle import (
     VehicleAvailabilityResponse,
     VehicleCreateRequest,
@@ -24,22 +25,26 @@ def create_vehicle(
     return vehicle_manager.create_vehicle(payload, created_by=current_user.id)
 
 
-@router.get("", response_model=list[VehicleResponse])
+@router.get("", response_model=PaginatedResponse[VehicleResponse])
 def list_vehicles(
     current_user: Annotated[UserResponse, Depends(get_current_user)],
     status_filter: str | None = Query(default=None, alias="status"),
     active: bool | None = Query(default=None),
     fuel_type: str | None = Query(default=None),
     search: str | None = Query(default=None, min_length=1),
-) -> list[VehicleResponse]:
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=15, ge=1, le=1000),
+) -> PaginatedResponse[VehicleResponse]:
     del current_user
-    query = VehicleListQuery(
-        status=status_filter,
-        active=active,
-        fuel_type=fuel_type,
-        search=search,
-    )
-    return vehicle_manager.list_vehicles(query)
+    query = VehicleListQuery(status=status_filter, active=active, fuel_type=fuel_type, search=search)
+    all_items = vehicle_manager.list_vehicles(query)
+    summary = {
+        "available": sum(1 for v in all_items if v.status == "available"),
+        "assigned": sum(1 for v in all_items if v.status == "assigned"),
+        "maintenance": sum(1 for v in all_items if v.status == "maintenance"),
+        "active_fleet": sum(1 for v in all_items if v.active),
+    }
+    return paginate(all_items, page, page_size, summary)
 
 
 @router.get("/availability", response_model=VehicleAvailabilityResponse)

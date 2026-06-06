@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.routes.auth import get_current_user, require_roles
 from app.schemas.auth import MessageResponse, UserResponse
+from app.schemas.common import PaginatedResponse, paginate
 from app.schemas.route import (
     RouteAssignRequest,
     RouteCreateRequest,
@@ -25,16 +26,27 @@ def create_route(
     return route_manager.create_route(payload, created_by=current_user.id)
 
 
-@router.get("", response_model=list[RouteResponse])
+@router.get("", response_model=PaginatedResponse[RouteResponse])
 def list_routes(
     current_user: Annotated[UserResponse, Depends(get_current_user)],
     service_type: str | None = Query(default=None),
     active: bool | None = Query(default=None),
     search: str | None = Query(default=None, min_length=1),
-) -> list[RouteResponse]:
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=15, ge=1, le=1000),
+) -> PaginatedResponse[RouteResponse]:
     del current_user
     query = RouteListQuery(service_type=service_type, active=active, search=search)
-    return route_manager.list_routes(query)
+    all_items = route_manager.list_routes(query)
+    summary = {
+        "active": sum(1 for r in all_items if r.active),
+        "inactive": sum(1 for r in all_items if not r.active),
+        "express": sum(1 for r in all_items if r.service_type == "express"),
+        "city": sum(1 for r in all_items if r.service_type == "city"),
+        "school": sum(1 for r in all_items if r.service_type == "school"),
+        "intercity": sum(1 for r in all_items if r.service_type == "intercity"),
+    }
+    return paginate(all_items, page, page_size, summary)
 
 
 @router.get("/{route_id}", response_model=RouteResponse)

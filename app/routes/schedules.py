@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.routes.auth import get_current_user, require_roles
 from app.schemas.auth import MessageResponse, UserResponse
+from app.schemas.common import PaginatedResponse, paginate
 from app.schemas.schedule import (
     EmergencyScheduleUpdateRequest,
     RecurringScheduleRequest,
@@ -43,7 +44,7 @@ def check_schedule_conflicts(
     return schedule_manager.detect_conflicts(payload)
 
 
-@router.get("", response_model=list[ScheduleResponse])
+@router.get("", response_model=PaginatedResponse[ScheduleResponse])
 def list_schedules(
     current_user: Annotated[UserResponse, Depends(get_current_user)],
     route_id: str | None = Query(default=None),
@@ -52,7 +53,9 @@ def list_schedules(
     status_filter: str | None = Query(default=None, alias="status"),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
-) -> list[ScheduleResponse]:
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=15, ge=1, le=1000),
+) -> PaginatedResponse[ScheduleResponse]:
     del current_user
     query = ScheduleListQuery(
         route_id=route_id,
@@ -62,7 +65,17 @@ def list_schedules(
         date_from=date_from,
         date_to=date_to,
     )
-    return schedule_manager.list_schedules(query)
+    all_items = schedule_manager.list_schedules(query)
+    summary = {
+        "scheduled": sum(1 for s in all_items if s.status == "scheduled"),
+        "active": sum(1 for s in all_items if s.status == "active"),
+        "completed": sum(1 for s in all_items if s.status == "completed"),
+        "cancelled": sum(1 for s in all_items if s.status == "cancelled"),
+        "delayed": sum(1 for s in all_items if s.status == "delayed"),
+        "emergency": sum(1 for s in all_items if s.status == "emergency"),
+        "emergency_flag": sum(1 for s in all_items if s.emergency_update),
+    }
+    return paginate(all_items, page, page_size, summary)
 
 
 @router.get("/{schedule_id}", response_model=ScheduleResponse)

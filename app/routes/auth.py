@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from app.schemas.auth import (
     LoginRequest,
@@ -11,6 +11,7 @@ from app.schemas.auth import (
     UserResponse,
     UserUpdateRequest,
 )
+from app.schemas.common import PaginatedResponse, paginate
 from app.services.auth_service import auth_manager
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -119,11 +120,27 @@ def logout_all(
     return MessageResponse(message=f"Closed {revoked} active session(s).")
 
 
-@router.get("/users", response_model=list[UserResponse])
+@router.get("/users", response_model=PaginatedResponse[UserResponse])
 def list_users(
     _: Annotated[UserResponse, Depends(require_roles("admin"))],
-) -> list[UserResponse]:
-    return auth_manager.list_users()
+    search: str | None = Query(default=None),
+    role: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=15, ge=1, le=1000),
+) -> PaginatedResponse[UserResponse]:
+    all_users = auth_manager.list_users()
+    if search:
+        q = search.lower()
+        all_users = [u for u in all_users if q in u.full_name.lower() or q in u.email.lower()]
+    if role:
+        all_users = [u for u in all_users if u.role == role]
+    summary = {
+        "admin": sum(1 for u in all_users if u.role == "admin"),
+        "manager": sum(1 for u in all_users if u.role == "manager"),
+        "driver": sum(1 for u in all_users if u.role == "driver"),
+        "user": sum(1 for u in all_users if u.role == "user"),
+    }
+    return paginate(all_users, page, page_size, summary)
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)

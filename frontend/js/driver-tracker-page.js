@@ -22,12 +22,14 @@ export async function mount(container, token) {
 
 async function loadPage() {
   try {
-    const [user, vehicles, schedules] = await Promise.all([
+    const [user, vehiclesResult, schedulesResult] = await Promise.all([
       fetchCurrentUser(_token),
-      apiRequest("/vehicles", { headers: authHeaders(_token) }),
-      apiRequest("/schedules?status=active", { headers: authHeaders(_token) }).catch(() => []),
+      apiRequest("/vehicles?page=1&page_size=1000", { headers: authHeaders(_token) }),
+      apiRequest("/schedules?status=active&page=1&page_size=1000", { headers: authHeaders(_token) }).catch(() => ({ items: [] })),
     ]);
     _user = user;
+    const vehicles = vehiclesResult.items;
+    const schedules = schedulesResult.items;
 
     // Find vehicle assigned to this driver via active schedule
     const mySchedule = schedules.find(s => s.driver_id === user.id);

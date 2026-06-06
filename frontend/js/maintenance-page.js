@@ -1,11 +1,19 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderShellLayout, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderShellLayout, renderPagination, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
+
+const PAGE_SIZE = 15;
 
 let _container, _token, _role;
 let vehicles = [];
 let activeTab = "fuel";
 let editingMaintenanceId = null;
+
+let _fuelPage = 1, _fuelTotalPages = 1, _fuelTotal = 0, _fuelSummary = {};
+let _maintPage = 1, _maintTotalPages = 1, _maintTotal = 0, _maintSummary = {};
+let _fuelVehicleFilter = "";
+let _maintVehicleFilter = "";
+let _maintStatusFilter = "";
 
 const canManage = () => _role === "admin" || _role === "manager";
 
@@ -15,22 +23,42 @@ export async function mount(container, token) {
   _role = null;
   editingMaintenanceId = null;
   activeTab = "fuel";
+  _fuelPage = 1;
+  _maintPage = 1;
+  _fuelVehicleFilter = "";
+  _maintVehicleFilter = "";
+  _maintStatusFilter = "";
   await loadPage();
 }
 
 async function loadPage() {
   showLoader("Loading Maintenance…");
   try {
-    const [user, vList, fuelLogs, maintenanceLogs, dueReminders] = await Promise.all([
+    const fuelParams = new URLSearchParams({ page: _fuelPage, page_size: PAGE_SIZE });
+    if (_fuelVehicleFilter) fuelParams.set("vehicle_id", _fuelVehicleFilter);
+
+    const maintParams = new URLSearchParams({ page: _maintPage, page_size: PAGE_SIZE });
+    if (_maintVehicleFilter) maintParams.set("vehicle_id", _maintVehicleFilter);
+    if (_maintStatusFilter) maintParams.set("status", _maintStatusFilter);
+
+    const [user, vResult, fuelResult, maintResult, dueReminders] = await Promise.all([
       fetchCurrentUser(_token),
-      apiRequest("/vehicles", { headers: authHeaders(_token) }),
-      apiRequest("/maintenance/fuel-logs", { headers: authHeaders(_token) }),
-      apiRequest("/maintenance/maintenance-logs", { headers: authHeaders(_token) }),
+      apiRequest("/vehicles?page=1&page_size=1000", { headers: authHeaders(_token) }),
+      apiRequest(`/maintenance/fuel-logs?${fuelParams}`, { headers: authHeaders(_token) }),
+      apiRequest(`/maintenance/maintenance-logs?${maintParams}`, { headers: authHeaders(_token) }),
       apiRequest("/maintenance/due-reminders?days_ahead=30", { headers: authHeaders(_token) }),
     ]);
     _role = user.role;
-    vehicles = vList;
-    render(user, fuelLogs, maintenanceLogs, dueReminders);
+    vehicles = vResult.items;
+    _fuelTotal = fuelResult.total;
+    _fuelTotalPages = fuelResult.total_pages;
+    _fuelPage = fuelResult.page;
+    _fuelSummary = fuelResult.summary;
+    _maintTotal = maintResult.total;
+    _maintTotalPages = maintResult.total_pages;
+    _maintPage = maintResult.page;
+    _maintSummary = maintResult.summary;
+    render(user, fuelResult.items, maintResult.items, dueReminders);
   } finally {
     hideLoader();
   }
@@ -59,10 +87,10 @@ function buildDueRemindersHTML(dueReminders) {
 }
 
 function render(user, fuelLogs, maintenanceLogs, dueReminders = []) {
-  const totalFuelCost = fuelLogs.reduce((s, l) => s + l.cost, 0).toFixed(2);
-  const totalMaintCost = maintenanceLogs.reduce((s, l) => s + l.cost, 0).toFixed(2);
-  const pending = maintenanceLogs.filter((l) => l.status === "scheduled" || l.status === "in_progress").length;
   const overdueCount = dueReminders.filter((r) => r.days_until_due <= 7).length;
+  const totalFuelCost = (_fuelSummary.total_cost ?? 0).toFixed(2);
+  const totalMaintCost = (_maintSummary.total_cost ?? 0).toFixed(2);
+  const pending = _maintSummary.pending ?? 0;
 
   _container.innerHTML = renderShellLayout({
     user,
@@ -73,9 +101,9 @@ function render(user, fuelLogs, maintenanceLogs, dueReminders = []) {
       <section class="dashboard-grid">
         ${buildDueRemindersHTML(dueReminders)}
         <div class="stats-grid">
-          <article class="stat-card"><div class="stat-card-body"><span>Fuel Logs</span><strong>${fuelLogs.length}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Fuel Logs</span><strong>${_fuelTotal}</strong></div></article>
           <article class="stat-card"><div class="stat-card-body"><span>Total Fuel Cost</span><strong>$${totalFuelCost}</strong></div></article>
-          <article class="stat-card"><div class="stat-card-body"><span>Maintenance Logs</span><strong>${maintenanceLogs.length}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Maintenance Logs</span><strong>${_maintTotal}</strong></div></article>
           <article class="stat-card"><div class="stat-card-body"><span>Pending Service</span><strong>${pending}</strong></div></article>
           <article class="stat-card"><div class="stat-card-body"><span>Due ≤ 7 Days</span><strong style="${overdueCount > 0 ? "color:#dc2626" : ""}">${overdueCount}</strong></div></article>
         </div>
@@ -89,7 +117,7 @@ function render(user, fuelLogs, maintenanceLogs, dueReminders = []) {
             ${renderFilters(`
               <select class="filter-input" id="fuel-vehicle-filter" style="max-width:240px">
                 <option value="">All Vehicles</option>
-                ${vehicleOptions()}
+                ${vehicleOptions(_fuelVehicleFilter)}
               </select>
               <button class="ghost-btn" id="fuel-filter-btn">Filter</button>
               ${canManage() ? `<button class="primary-btn" id="add-fuel-btn">+ Log Fuel</button>` : ""}
@@ -108,20 +136,21 @@ function render(user, fuelLogs, maintenanceLogs, dueReminders = []) {
               `),
               emptyMessage: "No fuel logs recorded yet.",
             })}
+            ${renderPagination({ page: _fuelPage, totalPages: _fuelTotalPages, total: _fuelTotal, pageSize: PAGE_SIZE })}
           </div>
 
           <div id="maintenance-tab" ${activeTab !== "maintenance" ? 'style="display:none"' : ""}>
             ${renderFilters(`
               <select class="filter-input" id="maint-vehicle-filter" style="max-width:200px">
                 <option value="">All Vehicles</option>
-                ${vehicleOptions()}
+                ${vehicleOptions(_maintVehicleFilter)}
               </select>
               <select class="filter-input" id="maint-status-filter" style="max-width:160px">
                 <option value="">All Statuses</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="scheduled" ${_maintStatusFilter === "scheduled" ? "selected" : ""}>Scheduled</option>
+                <option value="in_progress" ${_maintStatusFilter === "in_progress" ? "selected" : ""}>In Progress</option>
+                <option value="completed" ${_maintStatusFilter === "completed" ? "selected" : ""}>Completed</option>
+                <option value="cancelled" ${_maintStatusFilter === "cancelled" ? "selected" : ""}>Cancelled</option>
               </select>
               <button class="ghost-btn" id="maint-filter-btn">Filter</button>
               ${canManage() ? `<button class="primary-btn" id="add-maint-btn">+ Log Maintenance</button>` : ""}
@@ -143,6 +172,7 @@ function render(user, fuelLogs, maintenanceLogs, dueReminders = []) {
               `),
               emptyMessage: "No maintenance logs recorded yet.",
             })}
+            ${renderPagination({ page: _maintPage, totalPages: _maintTotalPages, total: _maintTotal, pageSize: PAGE_SIZE })}
           </div>
         </section>
       </section>
@@ -261,6 +291,20 @@ function bindActions() {
   document.querySelectorAll("[data-maint-edit]").forEach((btn) => {
     btn.addEventListener("click", () => startMaintenanceEdit(btn.dataset.maintEdit));
   });
+
+  document.querySelectorAll("#fuel-tab .pagination [data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _fuelPage = parseInt(btn.dataset.page);
+      loadPage();
+    });
+  });
+
+  document.querySelectorAll("#maintenance-tab .pagination [data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _maintPage = parseInt(btn.dataset.page);
+      loadPage();
+    });
+  });
 }
 
 function switchTab(tab) {
@@ -306,9 +350,7 @@ async function submitFuelForm() {
 async function startMaintenanceEdit(id) {
   showLoader("Loading Log…");
   try {
-    const logs = await apiRequest("/maintenance/maintenance-logs", { headers: authHeaders(_token) });
-    const log = logs.find((l) => l.id === id);
-    if (!log) { showToast("Log not found.", "error"); return; }
+    const log = await apiRequest(`/maintenance/maintenance-logs/${id}`, { headers: authHeaders(_token) });
     openMaintenancePanel(log);
   } catch {
     showToast("Could not load log.", "error");
@@ -353,39 +395,14 @@ async function submitMaintenanceForm() {
 }
 
 async function applyFuelFilter() {
-  const vehicleId = document.getElementById("fuel-vehicle-filter").value;
-  const url = vehicleId ? `/maintenance/fuel-logs?vehicle_id=${encodeURIComponent(vehicleId)}` : "/maintenance/fuel-logs";
-  showLoader("Filtering…");
-  try {
-    const [user, fuelLogs, maintenanceLogs, dueReminders] = await Promise.all([
-      fetchCurrentUser(_token),
-      apiRequest(url, { headers: authHeaders(_token) }),
-      apiRequest("/maintenance/maintenance-logs", { headers: authHeaders(_token) }),
-      apiRequest("/maintenance/due-reminders?days_ahead=30", { headers: authHeaders(_token) }),
-    ]);
-    render(user, fuelLogs, maintenanceLogs, dueReminders);
-  } finally {
-    hideLoader();
-  }
+  _fuelVehicleFilter = document.getElementById("fuel-vehicle-filter").value;
+  _fuelPage = 1;
+  await loadPage();
 }
 
 async function applyMaintenanceFilter() {
-  const vehicleId = document.getElementById("maint-vehicle-filter").value;
-  const status = document.getElementById("maint-status-filter").value;
-  const params = new URLSearchParams();
-  if (vehicleId) params.set("vehicle_id", vehicleId);
-  if (status) params.set("status", status);
-  const url = `/maintenance/maintenance-logs${params.toString() ? "?" + params.toString() : ""}`;
-  showLoader("Filtering…");
-  try {
-    const [user, fuelLogs, maintenanceLogs, dueReminders] = await Promise.all([
-      fetchCurrentUser(_token),
-      apiRequest("/maintenance/fuel-logs", { headers: authHeaders(_token) }),
-      apiRequest(url, { headers: authHeaders(_token) }),
-      apiRequest("/maintenance/due-reminders?days_ahead=30", { headers: authHeaders(_token) }),
-    ]);
-    render(user, fuelLogs, maintenanceLogs, dueReminders);
-  } finally {
-    hideLoader();
-  }
+  _maintVehicleFilter = document.getElementById("maint-vehicle-filter").value;
+  _maintStatusFilter = document.getElementById("maint-status-filter").value;
+  _maintPage = 1;
+  await loadPage();
 }

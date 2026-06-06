@@ -1,9 +1,13 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, renderPagination, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
+
+const PAGE_SIZE = 15;
 
 let _container, _token, _role;
 let editingId = null;
+let _page = 1, _totalPages = 1, _total = 0, _summary = {};
+let _searchQuery = "";
 
 const isAdmin = () => _role === "admin";
 
@@ -12,6 +16,8 @@ export async function mount(container, token) {
   _token = token;
   _role = null;
   editingId = null;
+  _page = 1;
+  _searchQuery = "";
   await loadPage();
 }
 
@@ -20,8 +26,14 @@ async function loadPage() {
   try {
     const user = await fetchCurrentUser(_token);
     _role = user.role;
-    const drivers = await apiRequest("/drivers", { headers: authHeaders(_token) });
-    render(user, drivers);
+    const params = new URLSearchParams({ page: _page, page_size: PAGE_SIZE });
+    if (_searchQuery) params.set("search", _searchQuery);
+    const result = await apiRequest(`/drivers?${params}`, { headers: authHeaders(_token) });
+    _total = result.total;
+    _totalPages = result.total_pages;
+    _page = result.page;
+    _summary = result.summary;
+    render(user, result.items);
   } finally {
     hideLoader();
   }
@@ -66,16 +78,8 @@ function fmtDate(val) {
 // ── Render ────────────────────────────────────────────────────────────────────
 
 function render(user, drivers) {
-  const expiredCount = drivers.filter((d) => {
-    const s = licenseExpiryStatus(d.license_expiry_date);
-    return s && s.daysLeft < 0;
-  }).length;
-  const expiringCount = drivers.filter((d) => {
-    const s = licenseExpiryStatus(d.license_expiry_date);
-    return s && s.daysLeft >= 0 && s.daysLeft <= 30;
-  }).length;
-
   const licenseAlertBanner = buildLicenseAlertBanner(drivers);
+  const licenseAlertCount = (_summary.expired_licenses ?? 0) + (_summary.expiring_licenses ?? 0);
 
   _container.innerHTML = renderManagementPage({
     user,
@@ -83,14 +87,14 @@ function render(user, drivers) {
     title: "Driver Management",
     subtitle: "Manage workforce readiness, assignments, and operational coverage.",
     statsCards: [
-      { label: "Total Drivers", value: drivers.length },
-      { label: "Available", value: drivers.filter((d) => d.status === "available").length },
-      { label: "Assigned", value: drivers.filter((d) => d.status === "assigned").length },
+      { label: "Total Drivers", value: _total },
+      { label: "Available", value: _summary.available ?? drivers.filter((d) => d.status === "available").length },
+      { label: "Assigned", value: _summary.assigned ?? drivers.filter((d) => d.status === "assigned").length },
       { label: "On Leave", value: drivers.filter((d) => d.status === "on_leave").length },
-      { label: "License Alerts", value: expiredCount + expiringCount, highlight: expiredCount + expiringCount > 0 },
+      { label: "License Alerts", value: licenseAlertCount, highlight: licenseAlertCount > 0 },
     ],
     filterMarkup: renderFilters(`
-      <input class="filter-input" id="driver-search" placeholder="Search name or employee number">
+      <input class="filter-input" id="driver-search" placeholder="Search name or employee number" value="${_searchQuery}">
       <button class="ghost-btn" id="driver-search-btn" type="button">Search</button>
       ${isAdmin() ? `<button class="primary-btn" id="create-driver-btn" type="button">+ New Driver</button>` : ""}
     `),
@@ -125,7 +129,7 @@ function render(user, drivers) {
           `;
         }),
         emptyMessage: "No drivers yet. Click + New Driver to add one.",
-      })}
+      }) + renderPagination({ page: _page, totalPages: _totalPages, total: _total, pageSize: PAGE_SIZE })}
     `,
   });
 
@@ -451,6 +455,13 @@ function bindActions() {
       });
     });
   });
+
+  document.querySelectorAll(".pagination [data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _page = parseInt(btn.dataset.page);
+      loadPage();
+    });
+  });
 }
 
 async function startHistory(id) {
@@ -490,13 +501,7 @@ async function deleteDriver(id) {
 }
 
 async function applySearch() {
-  const search = document.getElementById("driver-search").value.trim();
-  showLoader("Searching…");
-  try {
-    const user = await fetchCurrentUser(_token);
-    const drivers = await apiRequest(search ? `/drivers?search=${encodeURIComponent(search)}` : "/drivers", { headers: authHeaders(_token) });
-    render(user, drivers);
-  } finally {
-    hideLoader();
-  }
+  _searchQuery = document.getElementById("driver-search").value.trim();
+  _page = 1;
+  await loadPage();
 }

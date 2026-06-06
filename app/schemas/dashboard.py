@@ -12,6 +12,7 @@ class DashboardCountsResponse(BaseModel):
     total_drivers: int
     assigned_drivers: int
     active_trips: int
+    on_time_trips: int = 0
     delayed_trips: int
     completed_trips: int
 
@@ -25,6 +26,11 @@ class DashboardScheduleItem(BaseModel):
     arrival_time: datetime
     status: str
     emergency_update: bool
+    on_time_status: str = "scheduled"
+    route_code: str = ""
+    route_name: str = ""
+    vehicle_registration: str = ""
+    driver_name: str = ""
 
 
 class DashboardUtilizationResponse(BaseModel):

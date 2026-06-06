@@ -239,6 +239,42 @@ export function renderFilters(markup) {
   return `<div class="filter-bar">${markup}</div>`;
 }
 
+export function renderPagination({ page, totalPages, total, pageSize }) {
+  if (totalPages <= 1) return "";
+  const from = Math.min((page - 1) * pageSize + 1, total);
+  const to = Math.min(page * pageSize, total);
+  const nums = _buildPageNums(page, totalPages);
+  return `
+    <div class="pagination">
+      <span class="pagination-info">Showing ${from}–${to} of ${total}</span>
+      <div class="pagination-controls">
+        <button class="page-btn" ${page <= 1 ? "disabled" : `data-page="${page - 1}"`}>&#8592;</button>
+        ${nums.map((n) =>
+          n === "…"
+            ? `<span class="page-ellipsis">…</span>`
+            : `<button class="page-btn${n === page ? " active" : ""}" ${n === page ? "disabled" : `data-page="${n}"`}>${n}</button>`
+        ).join("")}
+        <button class="page-btn" ${page >= totalPages ? "disabled" : `data-page="${page + 1}"`}>&#8594;</button>
+      </div>
+    </div>
+  `;
+}
+
+function _buildPageNums(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const set = new Set([1, total]);
+  for (let p = current - 2; p <= current + 2; p++) {
+    if (p >= 1 && p <= total) set.add(p);
+  }
+  const sorted = [...set].sort((a, b) => a - b);
+  const result = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push("…");
+    result.push(sorted[i]);
+  }
+  return result;
+}
+
 export function renderInlineError(id) {
   return `<div class="error-text" id="${id}"></div>`;
 }

@@ -1,11 +1,14 @@
 import { apiRequest } from "./api.js";
-import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
+import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, renderPagination, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
+const PAGE_SIZE = 15;
 const fmtDate = (val) => val ? new Date(val).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }) : "—";
 
 let _container, _token, _role;
 let editingId = null;
+let _page = 1, _totalPages = 1, _total = 0, _summary = {};
+let _searchQuery = "";
 
 const isAdmin = () => _role === "admin";
 
@@ -14,6 +17,8 @@ export async function mount(container, token) {
   _token = token;
   _role = null;
   editingId = null;
+  _page = 1;
+  _searchQuery = "";
   await loadPage();
 }
 
@@ -22,8 +27,14 @@ async function loadPage() {
   try {
     const user = await fetchCurrentUser(_token);
     _role = user.role;
-    const vehicles = await apiRequest("/vehicles", { headers: authHeaders(_token) });
-    render(user, vehicles);
+    const params = new URLSearchParams({ page: _page, page_size: PAGE_SIZE });
+    if (_searchQuery) params.set("search", _searchQuery);
+    const result = await apiRequest(`/vehicles?${params}`, { headers: authHeaders(_token) });
+    _total = result.total;
+    _totalPages = result.total_pages;
+    _page = result.page;
+    _summary = result.summary;
+    render(user, result.items);
   } finally {
     hideLoader();
   }
@@ -36,14 +47,14 @@ function render(user, vehicles) {
     title: "Vehicle Management",
     subtitle: "Track fleet readiness, availability, and operating capacity.",
     statsCards: [
-      { label: "Total Vehicles", value: vehicles.length },
-      { label: "Available", value: vehicles.filter((v) => v.status === "available").length },
-      { label: "Assigned", value: vehicles.filter((v) => v.status === "assigned").length },
-      { label: "Maintenance", value: vehicles.filter((v) => v.status === "maintenance").length },
-      { label: "Active Fleet", value: vehicles.filter((v) => v.active).length },
+      { label: "Total Vehicles", value: _total },
+      { label: "Available", value: _summary.available ?? 0 },
+      { label: "Assigned", value: _summary.assigned ?? 0 },
+      { label: "Maintenance", value: _summary.maintenance ?? 0 },
+      { label: "Active Fleet", value: _summary.active_fleet ?? 0 },
     ],
     filterMarkup: renderFilters(`
-      <input class="filter-input" id="vehicle-search" placeholder="Search registration or model">
+      <input class="filter-input" id="vehicle-search" placeholder="Search registration or model" value="${_searchQuery}">
       <button class="ghost-btn" id="vehicle-search-btn" type="button">Search</button>
       ${isAdmin() ? `<button class="primary-btn" id="create-vehicle-btn" type="button">+ New Vehicle</button>` : ""}
     `),
@@ -68,7 +79,7 @@ function render(user, vehicles) {
         </tr>
       `),
       emptyMessage: "No vehicles yet. Click + New Vehicle to add one.",
-    }),
+    }) + renderPagination({ page: _page, totalPages: _totalPages, total: _total, pageSize: PAGE_SIZE }),
   });
 
   bindActions();
@@ -138,7 +149,8 @@ function buildFormHTML(vehicle = null) {
 async function openMaintenanceHistory(vehicleId, registrationNo) {
   showLoader("Loading Maintenance History…");
   try {
-    const logs = await apiRequest(`/maintenance/maintenance-logs?vehicle_id=${encodeURIComponent(vehicleId)}`, { headers: authHeaders(_token) });
+    const result = await apiRequest(`/maintenance/maintenance-logs?vehicle_id=${encodeURIComponent(vehicleId)}&page_size=1000`, { headers: authHeaders(_token) });
+    const logs = result.items;
     let body;
     if (!logs.length) {
       body = `<p style="color:var(--text-soft);font-style:italic;padding:16px 0;">No maintenance records found for this vehicle.</p>`;
@@ -210,6 +222,13 @@ function bindActions() {
       });
     });
   });
+
+  document.querySelectorAll(".pagination [data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _page = parseInt(btn.dataset.page);
+      loadPage();
+    });
+  });
 }
 
 async function startEdit(id) {
@@ -274,13 +293,7 @@ async function deleteVehicle(id) {
 }
 
 async function applySearch() {
-  const search = document.getElementById("vehicle-search").value.trim();
-  showLoader("Searching…");
-  try {
-    const user = await fetchCurrentUser(_token);
-    const vehicles = await apiRequest(search ? `/vehicles?search=${encodeURIComponent(search)}` : "/vehicles", { headers: authHeaders(_token) });
-    render(user, vehicles);
-  } finally {
-    hideLoader();
-  }
+  _searchQuery = document.getElementById("vehicle-search").value.trim();
+  _page = 1;
+  await loadPage();
 }
