@@ -13,6 +13,7 @@ from app.schemas.maintenance import (
     FuelLogCreateRequest,
     FuelLogListQuery,
     FuelLogResponse,
+    MaintenanceDueReminder,
     MaintenanceLogCreateRequest,
     MaintenanceLogListQuery,
     MaintenanceLogResponse,
@@ -108,6 +109,35 @@ class LocalMaintenanceService:
             if "status" in updates:
                 self._sync_vehicle_status(existing["vehicle_id"], existing["status"])
             return self._to_maintenance_response(log_id, existing)
+
+    def get_due_reminders(self, days_ahead: int) -> list[MaintenanceDueReminder]:
+        from datetime import date, timedelta
+        with self._lock:
+            maintenance_logs = self._read_json(self._maintenance_logs_path)
+        today = date.today()
+        cutoff = today + timedelta(days=days_ahead)
+        reminders: list[MaintenanceDueReminder] = []
+        for log_id, payload in maintenance_logs.items():
+            if payload.get("status") in {"completed", "cancelled"}:
+                continue
+            raw_due = payload.get("next_due_date")
+            if not raw_due:
+                continue
+            due = date.fromisoformat(raw_due)
+            if today <= due <= cutoff:
+                reminders.append(
+                    MaintenanceDueReminder(
+                        log_id=log_id,
+                        vehicle_id=payload["vehicle_id"],
+                        service_type=payload["service_type"],
+                        next_due_date=due,
+                        days_until_due=(due - today).days,
+                        workshop_name=payload.get("workshop_name"),
+                        description=payload.get("description"),
+                    )
+                )
+        reminders.sort(key=lambda r: r.days_until_due)
+        return reminders
 
     def _sync_vehicle_status(self, vehicle_id: str, maintenance_status: str) -> None:
         if maintenance_status in {"scheduled", "in_progress"}:
@@ -249,6 +279,34 @@ class FirebaseMaintenanceService(LocalMaintenanceService):
             self._sync_vehicle_status(existing["vehicle_id"], existing["status"])
         return self._to_maintenance_response(log_id, existing)
 
+    def get_due_reminders(self, days_ahead: int) -> list[MaintenanceDueReminder]:
+        from datetime import date, timedelta
+        maintenance_logs = self.db.child("maintenance_logs").get().val() or {}
+        today = date.today()
+        cutoff = today + timedelta(days=days_ahead)
+        reminders: list[MaintenanceDueReminder] = []
+        for log_id, payload in maintenance_logs.items():
+            if payload.get("status") in {"completed", "cancelled"}:
+                continue
+            raw_due = payload.get("next_due_date")
+            if not raw_due:
+                continue
+            due = date.fromisoformat(raw_due)
+            if today <= due <= cutoff:
+                reminders.append(
+                    MaintenanceDueReminder(
+                        log_id=log_id,
+                        vehicle_id=payload["vehicle_id"],
+                        service_type=payload["service_type"],
+                        next_due_date=due,
+                        days_until_due=(due - today).days,
+                        workshop_name=payload.get("workshop_name"),
+                        description=payload.get("description"),
+                    )
+                )
+        reminders.sort(key=lambda r: r.days_until_due)
+        return reminders
+
 
 class MaintenanceManager:
     def __init__(self) -> None:
@@ -276,6 +334,9 @@ class MaintenanceManager:
         self, log_id: str, payload: MaintenanceLogUpdateRequest
     ) -> MaintenanceLogResponse:
         return self.provider.update_maintenance_log(log_id, payload)
+
+    def get_due_reminders(self, days_ahead: int) -> list[MaintenanceDueReminder]:
+        return self.provider.get_due_reminders(days_ahead)
 
 
 maintenance_manager = MaintenanceManager()

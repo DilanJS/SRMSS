@@ -24,6 +24,7 @@ class DriverBase(BaseModel):
     employee_no: str = Field(min_length=2, max_length=20)
     full_name: str = Field(min_length=3, max_length=120)
     license_no: str = Field(min_length=4, max_length=40)
+    license_expiry_date: date | None = None
     phone_number: str = Field(min_length=7, max_length=20)
     years_of_experience: int = Field(ge=0, le=60)
     working_hours: float = Field(ge=0, le=168)
@@ -63,6 +64,7 @@ class DriverUpdateRequest(BaseModel):
     employee_no: str | None = Field(default=None, min_length=2, max_length=20)
     full_name: str | None = Field(default=None, min_length=3, max_length=120)
     license_no: str | None = Field(default=None, min_length=4, max_length=40)
+    license_expiry_date: date | None = None
     phone_number: str | None = Field(default=None, min_length=7, max_length=20)
     years_of_experience: int | None = Field(default=None, ge=0, le=60)
     working_hours: float | None = Field(default=None, ge=0, le=168)

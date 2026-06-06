@@ -8,6 +8,7 @@ from app.schemas.maintenance import (
     FuelLogCreateRequest,
     FuelLogListQuery,
     FuelLogResponse,
+    MaintenanceDueReminder,
     MaintenanceLogCreateRequest,
     MaintenanceLogListQuery,
     MaintenanceLogResponse,
@@ -67,3 +68,11 @@ def update_maintenance_log(
     _: Annotated[UserResponse, Depends(require_roles("admin", "manager"))],
 ) -> MaintenanceLogResponse:
     return maintenance_manager.update_maintenance_log(log_id, payload)
+
+
+@router.get("/due-reminders", response_model=list[MaintenanceDueReminder])
+def get_due_reminders(
+    _: Annotated[UserResponse, Depends(get_current_user)],
+    days_ahead: int = Query(default=30, ge=1, le=365),
+) -> list[MaintenanceDueReminder]:
+    return maintenance_manager.get_due_reminders(days_ahead)

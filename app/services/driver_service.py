@@ -130,11 +130,13 @@ class LocalDriverService:
                 )
 
     def _to_response(self, driver_id: str, payload: dict[str, Any]) -> DriverResponse:
+        raw_expiry = payload.get("license_expiry_date")
         return DriverResponse(
             id=driver_id,
             employee_no=payload["employee_no"],
             full_name=payload["full_name"],
             license_no=payload["license_no"],
+            license_expiry_date=date.fromisoformat(raw_expiry) if raw_expiry else None,
             phone_number=payload["phone_number"],
             years_of_experience=payload["years_of_experience"],
             working_hours=payload["working_hours"],
@@ -259,11 +261,13 @@ class FirebaseDriverService:
                 )
 
     def _to_response(self, driver_id: str, payload: dict[str, Any]) -> DriverResponse:
+        raw_expiry = payload.get("license_expiry_date")
         return DriverResponse(
             id=driver_id,
             employee_no=payload["employee_no"],
             full_name=payload["full_name"],
             license_no=payload["license_no"],
+            license_expiry_date=date.fromisoformat(raw_expiry) if raw_expiry else None,
             phone_number=payload["phone_number"],
             years_of_experience=payload["years_of_experience"],
             working_hours=payload["working_hours"],

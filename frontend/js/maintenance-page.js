@@ -21,15 +21,16 @@ export async function mount(container, token) {
 async function loadPage() {
   showLoader("Loading Maintenance…");
   try {
-    const [user, vList, fuelLogs, maintenanceLogs] = await Promise.all([
+    const [user, vList, fuelLogs, maintenanceLogs, dueReminders] = await Promise.all([
       fetchCurrentUser(_token),
       apiRequest("/vehicles", { headers: authHeaders(_token) }),
       apiRequest("/maintenance/fuel-logs", { headers: authHeaders(_token) }),
       apiRequest("/maintenance/maintenance-logs", { headers: authHeaders(_token) }),
+      apiRequest("/maintenance/due-reminders?days_ahead=30", { headers: authHeaders(_token) }),
     ]);
     _role = user.role;
     vehicles = vList;
-    render(user, fuelLogs, maintenanceLogs);
+    render(user, fuelLogs, maintenanceLogs, dueReminders);
   } finally {
     hideLoader();
   }
@@ -41,10 +42,27 @@ const vehicleOptions = (selected = "") => vehicles.map((v) =>
 ).join("");
 const fmtDate = (value) => value ? new Date(value).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }) : "—";
 
-function render(user, fuelLogs, maintenanceLogs) {
+function buildDueRemindersHTML(dueReminders) {
+  if (!dueReminders || dueReminders.length === 0) return "";
+  const rows = dueReminders.map((r) => {
+    const urgency = r.days_until_due === 0 ? "DUE TODAY" : r.days_until_due === 1 ? "Due tomorrow" : `Due in ${r.days_until_due} day${r.days_until_due !== 1 ? "s" : ""}`;
+    const labelStyle = r.days_until_due <= 3 ? "color:#dc2626;font-weight:700;" : r.days_until_due <= 7 ? "color:#d97706;font-weight:600;" : "color:#64748b;";
+    return `<li style="padding:6px 0;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+      <span><strong>${vehicleName(r.vehicle_id)}</strong> — ${r.service_type.replace(/_/g, " ")}${r.workshop_name ? ` (${r.workshop_name})` : ""}</span>
+      <span style="${labelStyle}">${urgency}</span>
+    </li>`;
+  }).join("");
+  return `<div class="panel" style="border-left:4px solid #f59e0b;background:#fffbeb;padding:14px 18px;margin-bottom:16px;">
+    <strong style="color:#92400e;">Upcoming Maintenance — Next 30 Days (${dueReminders.length})</strong>
+    <ul style="list-style:none;padding:0;margin:8px 0 0;">${rows}</ul>
+  </div>`;
+}
+
+function render(user, fuelLogs, maintenanceLogs, dueReminders = []) {
   const totalFuelCost = fuelLogs.reduce((s, l) => s + l.cost, 0).toFixed(2);
   const totalMaintCost = maintenanceLogs.reduce((s, l) => s + l.cost, 0).toFixed(2);
   const pending = maintenanceLogs.filter((l) => l.status === "scheduled" || l.status === "in_progress").length;
+  const overdueCount = dueReminders.filter((r) => r.days_until_due <= 7).length;
 
   _container.innerHTML = renderShellLayout({
     user,
@@ -53,12 +71,13 @@ function render(user, fuelLogs, maintenanceLogs) {
     subtitle: "Track fuel consumption and manage vehicle maintenance schedules.",
     content: `
       <section class="dashboard-grid">
+        ${buildDueRemindersHTML(dueReminders)}
         <div class="stats-grid">
           <article class="stat-card"><div class="stat-card-body"><span>Fuel Logs</span><strong>${fuelLogs.length}</strong></div></article>
           <article class="stat-card"><div class="stat-card-body"><span>Total Fuel Cost</span><strong>$${totalFuelCost}</strong></div></article>
           <article class="stat-card"><div class="stat-card-body"><span>Maintenance Logs</span><strong>${maintenanceLogs.length}</strong></div></article>
           <article class="stat-card"><div class="stat-card-body"><span>Pending Service</span><strong>${pending}</strong></div></article>
-          <article class="stat-card"><div class="stat-card-body"><span>Maint. Cost</span><strong>$${totalMaintCost}</strong></div></article>
+          <article class="stat-card"><div class="stat-card-body"><span>Due ≤ 7 Days</span><strong style="${overdueCount > 0 ? "color:#dc2626" : ""}">${overdueCount}</strong></div></article>
         </div>
         <section class="panel">
           <div class="tab-bar">
@@ -338,12 +357,13 @@ async function applyFuelFilter() {
   const url = vehicleId ? `/maintenance/fuel-logs?vehicle_id=${encodeURIComponent(vehicleId)}` : "/maintenance/fuel-logs";
   showLoader("Filtering…");
   try {
-    const [user, fuelLogs, maintenanceLogs] = await Promise.all([
+    const [user, fuelLogs, maintenanceLogs, dueReminders] = await Promise.all([
       fetchCurrentUser(_token),
       apiRequest(url, { headers: authHeaders(_token) }),
       apiRequest("/maintenance/maintenance-logs", { headers: authHeaders(_token) }),
+      apiRequest("/maintenance/due-reminders?days_ahead=30", { headers: authHeaders(_token) }),
     ]);
-    render(user, fuelLogs, maintenanceLogs);
+    render(user, fuelLogs, maintenanceLogs, dueReminders);
   } finally {
     hideLoader();
   }
@@ -358,12 +378,13 @@ async function applyMaintenanceFilter() {
   const url = `/maintenance/maintenance-logs${params.toString() ? "?" + params.toString() : ""}`;
   showLoader("Filtering…");
   try {
-    const [user, fuelLogs, maintenanceLogs] = await Promise.all([
+    const [user, fuelLogs, maintenanceLogs, dueReminders] = await Promise.all([
       fetchCurrentUser(_token),
       apiRequest("/maintenance/fuel-logs", { headers: authHeaders(_token) }),
       apiRequest(url, { headers: authHeaders(_token) }),
+      apiRequest("/maintenance/due-reminders?days_ahead=30", { headers: authHeaders(_token) }),
     ]);
-    render(user, fuelLogs, maintenanceLogs);
+    render(user, fuelLogs, maintenanceLogs, dueReminders);
   } finally {
     hideLoader();
   }

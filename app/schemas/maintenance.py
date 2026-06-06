@@ -85,3 +85,13 @@ class MaintenanceLogListQuery(BaseModel):
     vehicle_id: str | None = None
     status: MaintenanceStatus | None = None
     service_type: ServiceType | None = None
+
+
+class MaintenanceDueReminder(BaseModel):
+    log_id: str
+    vehicle_id: str
+    service_type: ServiceType
+    next_due_date: date
+    days_until_due: int
+    workshop_name: str | None = None
+    description: str | None = None

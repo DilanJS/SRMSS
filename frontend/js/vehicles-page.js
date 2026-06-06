@@ -2,6 +2,8 @@ import { apiRequest } from "./api.js";
 import { renderEntityTable, renderFilters, renderInlineError, renderManagementPage, showConfirm, showToast, showLoader, hideLoader, openSidePanel, closeSidePanel } from "./components.js";
 import { authHeaders, fetchCurrentUser, logout } from "./page-utils.js";
 
+const fmtDate = (val) => val ? new Date(val).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }) : "—";
+
 let _container, _token, _role;
 let editingId = null;
 
@@ -47,18 +49,22 @@ function render(user, vehicles) {
     `),
     tableTitle: "Fleet",
     tableMarkup: renderEntityTable({
-      columns: ["Registration", "Model", "Fuel", "Capacity", "Status", "Actions"],
+      columns: ["Registration", "Model", "Fuel", "Capacity", "Mileage", "Status", "Actions"],
       rows: vehicles.map((v) => `
         <tr>
           <td>${v.registration_no}</td>
           <td>${v.manufacturer} ${v.model}</td>
           <td>${v.fuel_type}</td>
           <td>${v.capacity}</td>
+          <td>${v.mileage_km.toLocaleString()} km</td>
           <td><span class="badge ${v.status}">${v.status}</span></td>
-          <td>${isAdmin() ? `<div class="table-actions">
-            <button class="table-btn" data-vehicle-edit="${v.id}">Edit</button>
-            <button class="table-btn danger-btn" data-vehicle-delete="${v.id}" data-vehicle-reg="${v.registration_no}">Delete</button>
-          </div>` : ""}</td>
+          <td><div class="table-actions">
+            <button class="table-btn" data-vehicle-maint="${v.id}" data-vehicle-reg="${v.registration_no}">Maint. History</button>
+            ${isAdmin() ? `
+              <button class="table-btn" data-vehicle-edit="${v.id}">Edit</button>
+              <button class="table-btn danger-btn" data-vehicle-delete="${v.id}" data-vehicle-reg="${v.registration_no}">Delete</button>
+            ` : ""}
+          </div></td>
         </tr>
       `),
       emptyMessage: "No vehicles yet. Click + New Vehicle to add one.",
@@ -129,6 +135,44 @@ function buildFormHTML(vehicle = null) {
   `;
 }
 
+async function openMaintenanceHistory(vehicleId, registrationNo) {
+  showLoader("Loading Maintenance History…");
+  try {
+    const logs = await apiRequest(`/maintenance/maintenance-logs?vehicle_id=${encodeURIComponent(vehicleId)}`, { headers: authHeaders(_token) });
+    let body;
+    if (!logs.length) {
+      body = `<p style="color:var(--text-soft);font-style:italic;padding:16px 0;">No maintenance records found for this vehicle.</p>`;
+    } else {
+      const rows = logs.map((l) => `
+        <tr>
+          <td>${fmtDate(l.service_date)}</td>
+          <td>${l.service_type.replace(/_/g, " ")}</td>
+          <td><span class="badge ${l.status}">${l.status.replace(/_/g, " ")}</span></td>
+          <td>$${l.cost.toFixed(2)}</td>
+          <td>${l.workshop_name || "—"}</td>
+          <td>${fmtDate(l.next_due_date)}</td>
+        </tr>
+      `).join("");
+      body = renderEntityTable({
+        columns: ["Date", "Service Type", "Status", "Cost", "Workshop", "Next Due"],
+        rows: [rows],
+        emptyMessage: "",
+      });
+    }
+    openSidePanel({
+      title: "Maintenance History",
+      subtitle: `Vehicle ${registrationNo}`,
+      body,
+      footer: `<button class="ghost-btn" type="button" id="maint-history-close">Close</button>`,
+    });
+    document.getElementById("maint-history-close").addEventListener("click", closeSidePanel);
+  } catch {
+    showToast("Could not load maintenance history.", "error");
+  } finally {
+    hideLoader();
+  }
+}
+
 function openVehiclePanel(vehicle = null) {
   editingId = vehicle?.id || null;
   openSidePanel({
@@ -148,6 +192,10 @@ function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
   document.getElementById("create-vehicle-btn")?.addEventListener("click", () => openVehiclePanel());
   document.getElementById("vehicle-search-btn").addEventListener("click", applySearch);
+
+  document.querySelectorAll("[data-vehicle-maint]").forEach((btn) => {
+    btn.addEventListener("click", () => openMaintenanceHistory(btn.dataset.vehicleMaint, btn.dataset.vehicleReg));
+  });
 
   document.querySelectorAll("[data-vehicle-edit]").forEach((btn) => {
     btn.addEventListener("click", () => startEdit(btn.dataset.vehicleEdit));

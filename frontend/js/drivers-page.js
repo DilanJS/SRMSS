@@ -27,7 +27,56 @@ async function loadPage() {
   }
 }
 
+// ── License expiry helpers ────────────────────────────────────────────────────
+
+function licenseExpiryStatus(expiryDate) {
+  if (!expiryDate) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const exp = new Date(expiryDate); exp.setHours(0, 0, 0, 0);
+  const daysLeft = Math.round((exp - today) / 86400000);
+  if (daysLeft < 0)  return { label: "EXPIRED",        daysLeft, cls: "expired" };
+  if (daysLeft <= 30) return { label: `${daysLeft}d left`, daysLeft, cls: "expiring" };
+  return { label: new Date(expiryDate).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }), daysLeft, cls: "valid" };
+}
+
+function buildLicenseAlertBanner(drivers) {
+  const alerts = drivers
+    .map((d) => ({ driver: d, status: licenseExpiryStatus(d.license_expiry_date) }))
+    .filter(({ status }) => status && status.daysLeft <= 30)
+    .sort((a, b) => a.status.daysLeft - b.status.daysLeft);
+
+  if (!alerts.length) return "";
+  const rows = alerts.map(({ driver, status }) => {
+    const color = status.daysLeft < 0 ? "#dc2626" : status.daysLeft <= 7 ? "#d97706" : "#ca8a04";
+    return `<li style="padding:5px 0;border-bottom:1px solid #fde68a;display:flex;justify-content:space-between;">
+      <span><strong>${driver.full_name}</strong> (${driver.employee_no}) — License ${driver.license_no}</span>
+      <span style="color:${color};font-weight:700;">${status.label}</span>
+    </li>`;
+  }).join("");
+  return `<div class="panel" style="border-left:4px solid #f59e0b;background:#fffbeb;padding:14px 18px;margin-bottom:16px;">
+    <strong style="color:#92400e;">License Validity Alerts (${alerts.length})</strong>
+    <ul style="list-style:none;padding:0;margin:8px 0 0;">${rows}</ul>
+  </div>`;
+}
+
+function fmtDate(val) {
+  return val ? new Date(val).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }) : "—";
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
 function render(user, drivers) {
+  const expiredCount = drivers.filter((d) => {
+    const s = licenseExpiryStatus(d.license_expiry_date);
+    return s && s.daysLeft < 0;
+  }).length;
+  const expiringCount = drivers.filter((d) => {
+    const s = licenseExpiryStatus(d.license_expiry_date);
+    return s && s.daysLeft >= 0 && s.daysLeft <= 30;
+  }).length;
+
+  const licenseAlertBanner = buildLicenseAlertBanner(drivers);
+
   _container.innerHTML = renderManagementPage({
     user,
     activeNav: "drivers",
@@ -38,7 +87,7 @@ function render(user, drivers) {
       { label: "Available", value: drivers.filter((d) => d.status === "available").length },
       { label: "Assigned", value: drivers.filter((d) => d.status === "assigned").length },
       { label: "On Leave", value: drivers.filter((d) => d.status === "on_leave").length },
-      { label: "Active Staff", value: drivers.filter((d) => d.active).length },
+      { label: "License Alerts", value: expiredCount + expiringCount, highlight: expiredCount + expiringCount > 0 },
     ],
     filterMarkup: renderFilters(`
       <input class="filter-input" id="driver-search" placeholder="Search name or employee number">
@@ -46,23 +95,38 @@ function render(user, drivers) {
       ${isAdmin() ? `<button class="primary-btn" id="create-driver-btn" type="button">+ New Driver</button>` : ""}
     `),
     tableTitle: "Drivers",
-    tableMarkup: renderEntityTable({
-      columns: ["Employee No.", "Name", "License", "Hours", "Status", "Actions"],
-      rows: drivers.map((d) => `
-        <tr>
-          <td>${d.employee_no}</td>
-          <td>${d.full_name}</td>
-          <td>${d.license_no}</td>
-          <td>${d.working_hours} hrs</td>
-          <td><span class="badge ${d.status}">${d.status.replace("_", " ")}</span></td>
-          <td>${isAdmin() ? `<div class="table-actions">
-            <button class="table-btn" data-driver-edit="${d.id}">Edit</button>
-            <button class="table-btn danger-btn" data-driver-delete="${d.id}" data-driver-name="${d.full_name}">Delete</button>
-          </div>` : ""}</td>
-        </tr>
-      `),
-      emptyMessage: "No drivers yet. Click + New Driver to add one.",
-    }),
+    tableMarkup: `
+      ${licenseAlertBanner}
+      ${renderEntityTable({
+        columns: ["Employee No.", "Name", "License No.", "License Expiry", "Hours", "Status", "Actions"],
+        rows: drivers.map((d) => {
+          const expiry = licenseExpiryStatus(d.license_expiry_date);
+          let expiryCell = "—";
+          if (expiry) {
+            const color = expiry.cls === "expired" ? "#dc2626" : expiry.cls === "expiring" ? "#d97706" : "#16a34a";
+            expiryCell = `<span style="color:${color};font-weight:${expiry.cls !== "valid" ? "700" : "400"}">${expiry.label}</span>`;
+          }
+          return `
+            <tr>
+              <td>${d.employee_no}</td>
+              <td>${d.full_name}</td>
+              <td>${d.license_no}</td>
+              <td>${expiryCell}</td>
+              <td>${d.working_hours} hrs</td>
+              <td><span class="badge ${d.status}">${d.status.replace("_", " ")}</span></td>
+              <td><div class="table-actions">
+                <button class="table-btn" data-driver-history="${d.id}" data-driver-name="${d.full_name}">History</button>
+                ${isAdmin() ? `
+                  <button class="table-btn" data-driver-edit="${d.id}">Edit</button>
+                  <button class="table-btn danger-btn" data-driver-delete="${d.id}" data-driver-name="${d.full_name}">Delete</button>
+                ` : ""}
+              </div></td>
+            </tr>
+          `;
+        }),
+        emptyMessage: "No drivers yet. Click + New Driver to add one.",
+      })}
+    `,
   });
 
   bindActions();
@@ -92,8 +156,18 @@ function buildCreateFormHTML() {
           <input name="license_no" placeholder="e.g. DL-456789" required>
         </div>
         <div class="field">
+          <label>License Expiry Date</label>
+          <input name="license_expiry_date" type="date">
+        </div>
+      </div>
+      <div class="split-grid">
+        <div class="field">
           <label>Phone</label>
           <input name="phone_number" placeholder="e.g. 077-1234567" required>
+        </div>
+        <div class="field">
+          <label>Hire Date</label>
+          <input name="hire_date" type="date" required>
         </div>
       </div>
       <div class="split-grid">
@@ -105,10 +179,6 @@ function buildCreateFormHTML() {
           <label>Working Hours/Day</label>
           <input name="working_hours" type="number" step="0.5" min="0" max="24" required>
         </div>
-      </div>
-      <div class="field">
-        <label>Hire Date</label>
-        <input name="hire_date" type="date" required>
       </div>
 
       <div class="form-section-label">Login Account</div>
@@ -133,6 +203,7 @@ function buildCreateFormHTML() {
 function buildEditFormHTML(driver) {
   const v = (field) => driver[field] ?? "";
   const sel = (field, val) => v(field) === val ? "selected" : "";
+  const expiryVal = driver.license_expiry_date ? String(driver.license_expiry_date).slice(0, 10) : "";
   return `
     <form id="driver-form" class="form-grid">
 
@@ -154,8 +225,18 @@ function buildEditFormHTML(driver) {
           <input name="license_no" value="${v("license_no")}" required>
         </div>
         <div class="field">
+          <label>License Expiry Date</label>
+          <input name="license_expiry_date" type="date" value="${expiryVal}">
+        </div>
+      </div>
+      <div class="split-grid">
+        <div class="field">
           <label>Phone</label>
           <input name="phone_number" value="${v("phone_number")}" required>
+        </div>
+        <div class="field">
+          <label>Hire Date</label>
+          <input name="hire_date" type="date" value="${v("hire_date") ? String(v("hire_date")).slice(0, 10) : ""}" required>
         </div>
       </div>
       <div class="split-grid">
@@ -167,10 +248,6 @@ function buildEditFormHTML(driver) {
           <label>Working Hours/Day</label>
           <input name="working_hours" type="number" step="0.5" min="0" max="24" value="${v("working_hours")}" required>
         </div>
-      </div>
-      <div class="field">
-        <label>Hire Date</label>
-        <input name="hire_date" type="date" value="${v("hire_date") ? String(v("hire_date")).slice(0, 10) : ""}" required>
       </div>
       <div class="field">
         <label>Status</label>
@@ -190,6 +267,43 @@ function buildEditFormHTML(driver) {
     </form>
   `;
 }
+
+// ── Assignment History Panel ──────────────────────────────────────────────────
+
+function buildHistoryPanelHTML(driver) {
+  const history = driver.assignment_history || [];
+  if (!history.length) {
+    return `<p style="color:var(--text-soft);font-style:italic;padding:16px 0;">No assignment history recorded for this driver.</p>`;
+  }
+  const rows = [...history]
+    .sort((a, b) => new Date(b.assigned_at) - new Date(a.assigned_at))
+    .map((entry) => `
+      <tr>
+        <td>${fmtDate(entry.assigned_at)}</td>
+        <td>${fmtDate(entry.released_at)}</td>
+        <td>${entry.route_id || "—"}</td>
+        <td>${entry.vehicle_id || "—"}</td>
+        <td>${entry.notes || "—"}</td>
+      </tr>
+    `).join("");
+  return renderEntityTable({
+    columns: ["Assigned", "Released", "Route ID", "Vehicle ID", "Notes"],
+    rows: [rows],
+    emptyMessage: "",
+  });
+}
+
+function openHistoryPanel(driver) {
+  openSidePanel({
+    title: "Assignment History",
+    subtitle: `${driver.full_name} (${driver.employee_no})`,
+    body: buildHistoryPanelHTML(driver),
+    footer: `<button class="ghost-btn" type="button" id="history-panel-close">Close</button>`,
+  });
+  document.getElementById("history-panel-close").addEventListener("click", closeSidePanel);
+}
+
+// ── Panel open/close ──────────────────────────────────────────────────────────
 
 function openCreatePanel() {
   editingId = null;
@@ -234,7 +348,6 @@ async function submitCreate() {
 
   let userId = null;
   try {
-    // Step 1: create the login account
     const userRes = await apiRequest("/auth/users", {
       method: "POST",
       headers: authHeaders(_token),
@@ -247,7 +360,6 @@ async function submitCreate() {
     });
     userId = userRes.id;
 
-    // Step 2: create the driver record
     showLoader("Creating Driver Record…");
     await apiRequest("/drivers", {
       method: "POST",
@@ -256,6 +368,7 @@ async function submitCreate() {
         employee_no: fd.get("employee_no"),
         full_name: fd.get("full_name"),
         license_no: fd.get("license_no"),
+        license_expiry_date: fd.get("license_expiry_date") || null,
         phone_number: fd.get("phone_number"),
         years_of_experience: Number(fd.get("years_of_experience")),
         working_hours: Number(fd.get("working_hours")),
@@ -274,7 +387,6 @@ async function submitCreate() {
   } catch (error) {
     hideLoader();
     if (userId) {
-      // User was created but driver record failed — surface a clear message
       errorNode.textContent = `Login account created but driver record failed: ${error.message}. Please delete the orphan user in User Management and try again.`;
     } else {
       errorNode.textContent = error.message;
@@ -298,6 +410,7 @@ async function submitEdit() {
         employee_no: fd.get("employee_no"),
         full_name: fd.get("full_name"),
         license_no: fd.get("license_no"),
+        license_expiry_date: fd.get("license_expiry_date") || null,
         phone_number: fd.get("phone_number"),
         years_of_experience: Number(fd.get("years_of_experience")),
         working_hours: Number(fd.get("working_hours")),
@@ -321,6 +434,10 @@ function bindActions() {
   document.getElementById("create-driver-btn")?.addEventListener("click", openCreatePanel);
   document.getElementById("driver-search-btn").addEventListener("click", applySearch);
 
+  document.querySelectorAll("[data-driver-history]").forEach((btn) => {
+    btn.addEventListener("click", () => startHistory(btn.dataset.driverHistory, btn.dataset.driverName));
+  });
+
   document.querySelectorAll("[data-driver-edit]").forEach((btn) => {
     btn.addEventListener("click", () => startEdit(btn.dataset.driverEdit));
   });
@@ -334,6 +451,18 @@ function bindActions() {
       });
     });
   });
+}
+
+async function startHistory(id) {
+  showLoader("Loading History…");
+  try {
+    const driver = await apiRequest(`/drivers/${id}`, { headers: authHeaders(_token) });
+    openHistoryPanel(driver);
+  } catch {
+    showToast("Could not load driver history.", "error");
+  } finally {
+    hideLoader();
+  }
 }
 
 async function startEdit(id) {
