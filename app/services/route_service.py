@@ -9,7 +9,6 @@ from fastapi import HTTPException, status
 
 from app.config import get_settings
 from app.firebase_config import get_firebase_db
-from app.schemas.driver import DriverUpdateRequest
 from app.schemas.route import (
     RouteCreateRequest,
     RouteListQuery,
@@ -17,7 +16,6 @@ from app.schemas.route import (
     RouteResponse,
     RouteUpdateRequest,
 )
-from app.schemas.vehicle import VehicleUpdateRequest
 
 
 def _utc_now() -> datetime:
@@ -137,116 +135,6 @@ class LocalRouteService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="A route with this code already exists.",
                 )
-
-    def assign_route(self, route_id: str, vehicle_id: str, driver_id: str) -> RouteResponse:
-        from app.services.driver_service import driver_manager
-        from app.services.vehicle_service import vehicle_manager
-
-        vehicle = vehicle_manager.get_vehicle(vehicle_id)
-        driver = driver_manager.get_driver(driver_id)
-
-        with self._lock:
-            routes = self._read_routes()
-            existing = routes.get(route_id)
-            if not existing:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found.")
-
-            if vehicle.status != "available" and vehicle.assigned_route_id != route_id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Vehicle '{vehicle.fleet_number}' is not available (status: {vehicle.status}).",
-                )
-            if driver.status != "available" and driver.assigned_route_id != route_id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Driver '{driver.full_name}' is not available (status: {driver.status}).",
-                )
-
-            old_vehicle_id = existing.get("assigned_vehicle_id")
-            old_driver_id = existing.get("assigned_driver_id")
-            existing["assigned_vehicle_id"] = vehicle_id
-            existing["assigned_driver_id"] = driver_id
-            existing["updated_at"] = _utc_now().isoformat()
-            self._write_routes(routes)
-
-        if old_vehicle_id and old_vehicle_id != vehicle_id:
-            try:
-                old_v = vehicle_manager.get_vehicle(old_vehicle_id)
-                if old_v.assigned_route_id == route_id:
-                    vehicle_manager.update_vehicle(
-                        old_vehicle_id,
-                        VehicleUpdateRequest(status="available", assigned_route_id=None, assigned_driver_id=None),
-                    )
-            except HTTPException:
-                pass
-
-        if old_driver_id and old_driver_id != driver_id:
-            try:
-                old_d = driver_manager.get_driver(old_driver_id)
-                if old_d.assigned_route_id == route_id:
-                    driver_manager.update_driver(
-                        old_driver_id,
-                        DriverUpdateRequest(status="available", assigned_route_id=None, assigned_vehicle_id=None),
-                    )
-            except HTTPException:
-                pass
-
-        vehicle_manager.update_vehicle(
-            vehicle_id,
-            VehicleUpdateRequest(status="assigned", assigned_route_id=route_id, assigned_driver_id=driver_id),
-        )
-        driver_manager.update_driver(
-            driver_id,
-            DriverUpdateRequest(status="assigned", assigned_route_id=route_id, assigned_vehicle_id=vehicle_id),
-        )
-        return self.get_route(route_id)
-
-    def unassign_route(self, route_id: str) -> RouteResponse:
-        from app.services.driver_service import driver_manager
-        from app.services.vehicle_service import vehicle_manager
-
-        with self._lock:
-            routes = self._read_routes()
-            existing = routes.get(route_id)
-            if not existing:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found.")
-
-            old_vehicle_id = existing.get("assigned_vehicle_id")
-            old_driver_id = existing.get("assigned_driver_id")
-            if not old_vehicle_id and not old_driver_id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Route has no current assignment to remove.",
-                )
-
-            existing["assigned_vehicle_id"] = None
-            existing["assigned_driver_id"] = None
-            existing["updated_at"] = _utc_now().isoformat()
-            self._write_routes(routes)
-
-        if old_vehicle_id:
-            try:
-                old_v = vehicle_manager.get_vehicle(old_vehicle_id)
-                if old_v.assigned_route_id == route_id:
-                    vehicle_manager.update_vehicle(
-                        old_vehicle_id,
-                        VehicleUpdateRequest(status="available", assigned_route_id=None, assigned_driver_id=None),
-                    )
-            except HTTPException:
-                pass
-
-        if old_driver_id:
-            try:
-                old_d = driver_manager.get_driver(old_driver_id)
-                if old_d.assigned_route_id == route_id:
-                    driver_manager.update_driver(
-                        old_driver_id,
-                        DriverUpdateRequest(status="available", assigned_route_id=None, assigned_vehicle_id=None),
-                    )
-            except HTTPException:
-                pass
-
-        return self.get_route(route_id)
 
     def _to_response(self, route_id: str, payload: dict[str, Any]) -> RouteResponse:
         return RouteResponse(
@@ -386,115 +274,6 @@ class FirebaseRouteService:
                     detail="A route with this code already exists.",
                 )
 
-    def assign_route(self, route_id: str, vehicle_id: str, driver_id: str) -> RouteResponse:
-        from app.services.driver_service import driver_manager
-        from app.services.vehicle_service import vehicle_manager
-
-        vehicle = vehicle_manager.get_vehicle(vehicle_id)
-        driver = driver_manager.get_driver(driver_id)
-
-        existing = self.db.child("routes").child(route_id).get().val()
-        if not existing:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found.")
-
-        if vehicle.status != "available" and vehicle.assigned_route_id != route_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Vehicle '{vehicle.fleet_number}' is not available (status: {vehicle.status}).",
-            )
-        if driver.status != "available" and driver.assigned_route_id != route_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Driver '{driver.full_name}' is not available (status: {driver.status}).",
-            )
-
-        old_vehicle_id = existing.get("assigned_vehicle_id")
-        old_driver_id = existing.get("assigned_driver_id")
-
-        self.db.child("routes").child(route_id).update({
-            "assigned_vehicle_id": vehicle_id,
-            "assigned_driver_id": driver_id,
-            "updated_at": _utc_now().isoformat(),
-        })
-
-        if old_vehicle_id and old_vehicle_id != vehicle_id:
-            try:
-                old_v = vehicle_manager.get_vehicle(old_vehicle_id)
-                if old_v.assigned_route_id == route_id:
-                    vehicle_manager.update_vehicle(
-                        old_vehicle_id,
-                        VehicleUpdateRequest(status="available", assigned_route_id=None, assigned_driver_id=None),
-                    )
-            except HTTPException:
-                pass
-
-        if old_driver_id and old_driver_id != driver_id:
-            try:
-                old_d = driver_manager.get_driver(old_driver_id)
-                if old_d.assigned_route_id == route_id:
-                    driver_manager.update_driver(
-                        old_driver_id,
-                        DriverUpdateRequest(status="available", assigned_route_id=None, assigned_vehicle_id=None),
-                    )
-            except HTTPException:
-                pass
-
-        vehicle_manager.update_vehicle(
-            vehicle_id,
-            VehicleUpdateRequest(status="assigned", assigned_route_id=route_id, assigned_driver_id=driver_id),
-        )
-        driver_manager.update_driver(
-            driver_id,
-            DriverUpdateRequest(status="assigned", assigned_route_id=route_id, assigned_vehicle_id=vehicle_id),
-        )
-        return self.get_route(route_id)
-
-    def unassign_route(self, route_id: str) -> RouteResponse:
-        from app.services.driver_service import driver_manager
-        from app.services.vehicle_service import vehicle_manager
-
-        existing = self.db.child("routes").child(route_id).get().val()
-        if not existing:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found.")
-
-        old_vehicle_id = existing.get("assigned_vehicle_id")
-        old_driver_id = existing.get("assigned_driver_id")
-        if not old_vehicle_id and not old_driver_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Route has no current assignment to remove.",
-            )
-
-        self.db.child("routes").child(route_id).update({
-            "assigned_vehicle_id": None,
-            "assigned_driver_id": None,
-            "updated_at": _utc_now().isoformat(),
-        })
-
-        if old_vehicle_id:
-            try:
-                old_v = vehicle_manager.get_vehicle(old_vehicle_id)
-                if old_v.assigned_route_id == route_id:
-                    vehicle_manager.update_vehicle(
-                        old_vehicle_id,
-                        VehicleUpdateRequest(status="available", assigned_route_id=None, assigned_driver_id=None),
-                    )
-            except HTTPException:
-                pass
-
-        if old_driver_id:
-            try:
-                old_d = driver_manager.get_driver(old_driver_id)
-                if old_d.assigned_route_id == route_id:
-                    driver_manager.update_driver(
-                        old_driver_id,
-                        DriverUpdateRequest(status="available", assigned_route_id=None, assigned_vehicle_id=None),
-                    )
-            except HTTPException:
-                pass
-
-        return self.get_route(route_id)
-
     def _to_response(self, route_id: str, payload: dict[str, Any]) -> RouteResponse:
         return RouteResponse(
             id=route_id,
@@ -542,12 +321,6 @@ class RouteManager:
 
     def delete_route(self, route_id: str) -> None:
         self.provider.delete_route(route_id)
-
-    def assign_route(self, route_id: str, vehicle_id: str, driver_id: str) -> RouteResponse:
-        return self.provider.assign_route(route_id, vehicle_id, driver_id)
-
-    def unassign_route(self, route_id: str) -> RouteResponse:
-        return self.provider.unassign_route(route_id)
 
     def get_route_map(self, route_id: str) -> RouteMapResponse:
         return self.provider.get_route_map(route_id)

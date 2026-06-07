@@ -6,8 +6,6 @@ const PAGE_SIZE = 15;
 
 let _container, _token, _role;
 let editingId = null;
-let _vehicles = [];
-let _drivers = [];
 let _page = 1, _totalPages = 1, _total = 0, _summary = {};
 let _searchQuery = "";
 
@@ -35,7 +33,6 @@ export async function mount(container, token) {
 }
 
 const isAdmin = () => _role === "admin";
-const canManage = () => _role === "admin" || _role === "manager";
 
 async function loadPage() {
   showLoader("Loading Routes…");
@@ -44,17 +41,11 @@ async function loadPage() {
     _role = user.role;
     const routeParams = new URLSearchParams({ page: _page, page_size: PAGE_SIZE });
     if (_searchQuery) routeParams.set("search", _searchQuery);
-    const [routeResult, vehiclesResult, driversResult] = await Promise.all([
-      apiRequest(`/routes?${routeParams}`, { headers: authHeaders(_token) }),
-      apiRequest("/vehicles?page=1&page_size=1000", { headers: authHeaders(_token) }),
-      apiRequest("/drivers?page=1&page_size=1000", { headers: authHeaders(_token) }),
-    ]);
+    const routeResult = await apiRequest(`/routes?${routeParams}`, { headers: authHeaders(_token) });
     _total = routeResult.total;
     _totalPages = routeResult.total_pages;
     _page = routeResult.page;
     _summary = routeResult.summary;
-    _vehicles = vehiclesResult.items;
-    _drivers = driversResult.items;
     render(user, routeResult.items);
   } finally {
     hideLoader();
@@ -81,17 +72,8 @@ function render(user, routes) {
     `),
     tableTitle: "Routes",
     tableMarkup: renderEntityTable({
-      columns: ["Code", "Name", "Service", "Stops", "Distance", "Status", "Assignment", "Actions"],
-      rows: routes.map((route) => {
-        const assignedVehicle = route.assigned_vehicle_id ? _vehicles.find(v => v.id === route.assigned_vehicle_id) : null;
-        const assignedDriver = route.assigned_driver_id ? _drivers.find(d => d.id === route.assigned_driver_id) : null;
-        const assignmentCell = (assignedVehicle || assignedDriver)
-          ? `<div class="assignment-cell">
-               ${assignedVehicle ? `<span class="assignment-vehicle">${assignedVehicle.fleet_number}</span>` : ""}
-               ${assignedDriver ? `<span class="assignment-driver">${assignedDriver.full_name}</span>` : ""}
-             </div>`
-          : `<span class="badge inactive">Unassigned</span>`;
-        return `
+      columns: ["Code", "Name", "Service", "Stops", "Distance", "Status", "Actions"],
+      rows: routes.map((route) => `
           <tr>
             <td>${route.route_code}</td>
             <td>${route.route_name}</td>
@@ -99,15 +81,12 @@ function render(user, routes) {
             <td>${route.stops?.length ?? 0}</td>
             <td>${route.distance_km} km</td>
             <td><span class="badge ${route.active ? "active" : "inactive"}">${route.active ? "active" : "inactive"}</span></td>
-            <td>${assignmentCell}</td>
             <td><div class="table-actions">
-              ${canManage() ? `<button class="table-btn" data-route-assign="${route.id}">Assign</button>` : ""}
               ${isAdmin() ? `<button class="table-btn" data-route-edit="${route.id}">Edit</button>` : ""}
               ${isAdmin() ? `<button class="table-btn danger-btn" data-route-delete="${route.id}" data-route-code="${route.route_code}">Delete</button>` : ""}
             </div></td>
           </tr>
-        `;
-      }),
+        `),
       emptyMessage: "No routes yet. Click + New Route to create one.",
     }) + renderPagination({ page: _page, totalPages: _totalPages, total: _total, pageSize: PAGE_SIZE }),
   });
@@ -451,20 +430,6 @@ function bindActions() {
   document.getElementById("create-route-btn")?.addEventListener("click", () => openRoutePanel());
   document.getElementById("route-search-btn").addEventListener("click", applyRouteSearch);
 
-  document.querySelectorAll("[data-route-assign]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      showLoader("Loading Route…");
-      try {
-        const route = await apiRequest(`/routes/${btn.dataset.routeAssign}`, { headers: authHeaders(_token) });
-        openAssignPanel(route);
-      } catch {
-        showToast("Could not load route data.", "error");
-      } finally {
-        hideLoader();
-      }
-    });
-  });
-
   document.querySelectorAll("[data-route-edit]").forEach((btn) => {
     btn.addEventListener("click", () => startEdit(btn.dataset.routeEdit));
   });
@@ -554,160 +519,6 @@ async function submitRouteForm() {
   } catch (error) {
     hideLoader();
     errorNode.textContent = error.message;
-  }
-}
-
-// ── Assignment panel ─────────────────────────────────────────────────────────
-
-function buildAssignFormHTML(route) {
-  const availableVehicles = _vehicles.filter(v =>
-    v.active && (v.status === "available" || v.id === route.assigned_vehicle_id)
-  );
-  const availableDrivers = _drivers.filter(d =>
-    d.active && (d.status === "available" || d.id === route.assigned_driver_id)
-  );
-
-  const assignedVehicle = route.assigned_vehicle_id ? _vehicles.find(v => v.id === route.assigned_vehicle_id) : null;
-  const assignedDriver = route.assigned_driver_id ? _drivers.find(d => d.id === route.assigned_driver_id) : null;
-  const isAssigned = assignedVehicle || assignedDriver;
-
-  return `
-    <div class="assign-route-info">
-      <div class="assign-info-row">
-        <span class="assign-label">Route</span>
-        <span class="assign-value">${route.route_code} — ${route.route_name}</span>
-      </div>
-      <div class="assign-info-row">
-        <span class="assign-label">Service Type</span>
-        <span class="assign-value">${route.service_type}</span>
-      </div>
-      <div class="assign-info-row">
-        <span class="assign-label">Distance</span>
-        <span class="assign-value">${route.stops?.length ?? 0} stops · ${route.distance_km} km</span>
-      </div>
-    </div>
-
-    ${isAssigned ? `
-      <div class="current-assignment-banner">
-        <div class="current-assign-title">Current Assignment</div>
-        <div class="current-assign-detail">
-          ${assignedVehicle
-            ? `Vehicle: <strong>${assignedVehicle.fleet_number}</strong> (${assignedVehicle.model}) · ${assignedVehicle.capacity} seats`
-            : "No vehicle assigned"}
-        </div>
-        <div class="current-assign-detail">
-          ${assignedDriver
-            ? `Driver: <strong>${assignedDriver.full_name}</strong> (${assignedDriver.employee_no})`
-            : "No driver assigned"}
-        </div>
-      </div>
-    ` : ""}
-
-    <form id="assign-form" class="form-grid">
-      <div class="field">
-        <label>Vehicle <span class="assign-field-hint">— available vehicles shown</span></label>
-        ${availableVehicles.length === 0
-          ? `<p class="assign-empty-note">No available vehicles. Release a vehicle from its current route first.</p>`
-          : `<select name="vehicle_id" required>
-              <option value="">— Select Vehicle —</option>
-              ${availableVehicles.map(v => `
-                <option value="${v.id}" ${v.id === route.assigned_vehicle_id ? "selected" : ""}>
-                  ${v.fleet_number} · ${v.model} · ${v.capacity} seats
-                </option>
-              `).join("")}
-            </select>`
-        }
-      </div>
-      <div class="field">
-        <label>Driver <span class="assign-field-hint">— available drivers shown</span></label>
-        ${availableDrivers.length === 0
-          ? `<p class="assign-empty-note">No available drivers. Release a driver from their current assignment first.</p>`
-          : `<select name="driver_id" required>
-              <option value="">— Select Driver —</option>
-              ${availableDrivers.map(d => `
-                <option value="${d.id}" ${d.id === route.assigned_driver_id ? "selected" : ""}>
-                  ${d.full_name} (${d.employee_no})
-                </option>
-              `).join("")}
-            </select>`
-        }
-      </div>
-      ${renderInlineError("assign-form-error")}
-    </form>
-  `;
-}
-
-function openAssignPanel(route) {
-  const isAssigned = route.assigned_vehicle_id || route.assigned_driver_id;
-
-  openSidePanel({
-    title: isAssigned ? "Update Assignment" : "Assign to Route",
-    subtitle: `Route ${route.route_code}: ${route.route_name}`,
-    body: buildAssignFormHTML(route),
-    footer: `
-      <button class="primary-btn" id="assign-panel-submit" type="button">
-        ${isAssigned ? "Update Assignment" : "Assign"}
-      </button>
-      ${isAssigned
-        ? `<button class="table-btn danger-btn" type="button" id="assign-panel-unassign">Unassign</button>`
-        : ""}
-      <button class="ghost-btn" type="button" id="assign-panel-cancel">Cancel</button>
-    `,
-  });
-
-  document.getElementById("assign-panel-submit").addEventListener("click", () => submitAssign(route.id));
-  document.getElementById("assign-panel-cancel").addEventListener("click", closeSidePanel);
-  document.getElementById("assign-panel-unassign")?.addEventListener("click", () => {
-    showConfirm({
-      title: "Remove Assignment",
-      message: `Remove the vehicle and driver assignment from route <strong>${route.route_code}</strong>?`,
-      onConfirm: () => doUnassign(route.id),
-    });
-  });
-}
-
-async function submitAssign(routeId) {
-  const errorNode = document.getElementById("assign-form-error");
-  errorNode.textContent = "";
-
-  const form = document.getElementById("assign-form");
-  if (!form.checkValidity()) { form.reportValidity(); return; }
-
-  const formData = new FormData(form);
-  const payload = {
-    vehicle_id: formData.get("vehicle_id"),
-    driver_id: formData.get("driver_id"),
-  };
-
-  showLoader("Saving Assignment…");
-  try {
-    await apiRequest(`/routes/${routeId}/assign`, {
-      method: "POST",
-      headers: authHeaders(_token),
-      body: JSON.stringify(payload),
-    });
-    showToast("Assignment saved successfully.");
-    closeSidePanel();
-    await loadPage();
-  } catch (error) {
-    hideLoader();
-    errorNode.textContent = error.message;
-  }
-}
-
-async function doUnassign(routeId) {
-  showLoader("Removing Assignment…");
-  try {
-    await apiRequest(`/routes/${routeId}/assign`, {
-      method: "DELETE",
-      headers: authHeaders(_token),
-    });
-    showToast("Assignment removed.", "info");
-    closeSidePanel();
-    await loadPage();
-  } catch (e) {
-    hideLoader();
-    showToast(e.message, "error");
   }
 }
 

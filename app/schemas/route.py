@@ -94,11 +94,6 @@ class RouteUpdateRequest(BaseModel):
         return stops
 
 
-class RouteAssignRequest(BaseModel):
-    vehicle_id: str
-    driver_id: str
-
-
 class RouteResponse(RouteBase):
     id: str
     assigned_vehicle_id: str | None = None

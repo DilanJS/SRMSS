@@ -8,6 +8,7 @@ let _container, _token, _role;
 let _user = null;
 let _allSchedules = [];
 let _currentStatusFilter = "";
+let _dateFrom = "", _dateTo = "";
 let _total = 0, _summary = {};
 let viewMode = "calendar";
 let currentYear = new Date().getFullYear();
@@ -26,6 +27,9 @@ export async function mount(container, token) {
   _token = token;
   _role = null;
   editingId = null;
+  _currentStatusFilter = "";
+  _dateFrom = "";
+  _dateTo = "";
   await loadPage();
 }
 
@@ -34,6 +38,12 @@ async function loadPage() {
   try {
     const schedParams = new URLSearchParams({ page: 1, page_size: 1000 });
     if (_currentStatusFilter) schedParams.set("status", _currentStatusFilter);
+    if (_dateFrom) schedParams.set("date_from", new Date(_dateFrom).toISOString());
+    if (_dateTo) {
+      const to = new Date(_dateTo);
+      to.setHours(23, 59, 59, 999);
+      schedParams.set("date_to", to.toISOString());
+    }
     const [user, schedResult, rResult, vResult, dResult] = await Promise.all([
       fetchCurrentUser(_token),
       apiRequest(`/schedules?${schedParams}`, { headers: authHeaders(_token) }),
@@ -226,7 +236,10 @@ function render(user, schedules) {
         ${opt("delayed", "Delayed")}
         ${opt("emergency", "Emergency")}
       </select>
+      <input class="filter-input" type="date" id="date-from-filter" value="${_dateFrom}" style="max-width:160px" title="From date">
+      <input class="filter-input" type="date" id="date-to-filter" value="${_dateTo}" style="max-width:160px" title="To date">
       <button class="ghost-btn" id="schedule-filter-btn" type="button">Filter</button>
+      <button class="ghost-btn" id="schedule-clear-btn" type="button">Clear</button>
       <div class="view-toggle" role="group" aria-label="View mode">
         <button class="view-toggle-btn ${viewMode === "calendar" ? "active" : ""}" id="view-cal-btn" type="button">Calendar</button>
         <button class="view-toggle-btn ${viewMode === "list" ? "active" : ""}" id="view-list-btn" type="button">List</button>
@@ -246,6 +259,7 @@ function bindActions() {
   document.getElementById("logout-btn").addEventListener("click", () => logout(_token));
   document.getElementById("create-schedule-btn")?.addEventListener("click", () => openSchedulePanel());
   document.getElementById("schedule-filter-btn").addEventListener("click", applyFilter);
+  document.getElementById("schedule-clear-btn").addEventListener("click", clearFilter);
 
   // View toggle
   document.getElementById("view-cal-btn")?.addEventListener("click", () => {
@@ -366,6 +380,15 @@ async function deleteSchedule(id) {
 
 async function applyFilter() {
   _currentStatusFilter = document.getElementById("status-filter")?.value || "";
+  _dateFrom = document.getElementById("date-from-filter")?.value || "";
+  _dateTo = document.getElementById("date-to-filter")?.value || "";
+  await loadPage();
+}
+
+async function clearFilter() {
+  _currentStatusFilter = "";
+  _dateFrom = "";
+  _dateTo = "";
   await loadPage();
 }
 
