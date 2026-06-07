@@ -260,10 +260,33 @@ class LocalScheduleService:
             if not overlaps:
                 continue
 
+            dep_str = existing_departure.strftime("%b %d, %H:%M")
+            arr_str = existing_arrival.strftime("%H:%M")
+
+            try:
+                route = route_manager.get_route(payload["route_id"])
+                route_label = f"{route.route_code} – {route.route_name}"
+            except Exception:
+                route_label = "another route"
+
             if payload["vehicle_id"] == vehicle_id:
-                conflicts.append(f"Vehicle conflict with schedule {existing_id}.")
+                try:
+                    vehicle = vehicle_manager.get_vehicle(vehicle_id)
+                    vehicle_label = vehicle.registration_no
+                except Exception:
+                    vehicle_label = "This vehicle"
+                conflicts.append(
+                    f"Vehicle {vehicle_label} is already assigned to {route_label} ({dep_str}–{arr_str})."
+                )
             if payload["driver_id"] == driver_id:
-                conflicts.append(f"Driver conflict with schedule {existing_id}.")
+                try:
+                    driver = driver_manager.get_driver(driver_id)
+                    driver_label = driver.full_name
+                except Exception:
+                    driver_label = "This driver"
+                conflicts.append(
+                    f"Driver {driver_label} is already assigned to {route_label} ({dep_str}–{arr_str})."
+                )
         return conflicts
 
     def _to_response(self, schedule_id: str, payload: dict[str, Any]) -> ScheduleResponse:
@@ -377,6 +400,19 @@ class FirebaseScheduleService(LocalScheduleService):
         if not payload:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found.")
         self.db.child("schedules").child(schedule_id).remove()
+
+    def detect_conflicts(self, payload: ScheduleCreateRequest, schedule_id: str | None = None) -> ScheduleConflictResponse:
+        schedules = self._read_schedules()
+        self._validate_references(payload.route_id, payload.vehicle_id, payload.driver_id)
+        conflicts = self._collect_conflicts(
+            schedules=schedules,
+            schedule_id=schedule_id,
+            vehicle_id=payload.vehicle_id,
+            driver_id=payload.driver_id,
+            departure_time=payload.departure_time,
+            arrival_time=payload.arrival_time,
+        )
+        return ScheduleConflictResponse(has_conflict=bool(conflicts), conflicts=conflicts)
 
     def _read_schedules(self) -> dict[str, Any]:
         return self.db.child("schedules").get().val() or {}

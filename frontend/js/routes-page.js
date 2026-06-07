@@ -274,14 +274,17 @@ function initRouteMap(route) {
   _map.on("click", onMapClick);
 }
 
+const SRI_LANKA_CENTER = [7.8731, 80.7718];
+const SRI_LANKA_ZOOM = 8;
+
 function setDefaultMapView() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       pos => _map?.setView([pos.coords.latitude, pos.coords.longitude], 13),
-      () => _map?.setView([20, 0], 2)
+      () => _map?.setView(SRI_LANKA_CENTER, SRI_LANKA_ZOOM)
     );
   } else {
-    _map?.setView([20, 0], 2);
+    _map?.setView(SRI_LANKA_CENTER, SRI_LANKA_ZOOM);
   }
 }
 
