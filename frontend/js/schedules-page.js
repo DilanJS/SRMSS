@@ -148,7 +148,7 @@ function buildCalendarHTML(schedules) {
         const code = routeCode(s.route_id);
         const tip = `${routeName(s.route_id)} · ${time}–${arrTime} · ${driverName(s.driver_id)} · ${vehicleName(s.vehicle_id)}`;
         return `<div class="cal-event ${s.status}" data-sched-view="${s.id}" title="${tip.replace(/"/g, "&quot;")}">
-          <span class="cal-event-dot"></span>${code} ${time}
+          <span class="cal-event-dot"></span><span class="cal-event-label">${code} ${time}</span>
         </div>`;
       })
       .join("");
@@ -172,8 +172,10 @@ function buildCalendarHTML(schedules) {
       </div>
       <button class="ghost-btn" id="cal-today-btn" type="button">Today</button>
     </div>
-    <div class="cal-header-row">${headerRow}</div>
-    <div class="cal-grid">${cells}</div>
+    <div class="cal-scroll-wrap">
+      <div class="cal-header-row">${headerRow}</div>
+      <div class="cal-grid">${cells}</div>
+    </div>
   `;
 }
 
@@ -227,7 +229,7 @@ function render(user, schedules) {
       { label: "Emergency", value: _summary.emergency_flag ?? 0 },
     ],
     filterMarkup: renderFilters(`
-      <select class="filter-input" id="status-filter" style="max-width:180px">
+      <select class="filter-input sched-status-filter" id="status-filter">
         ${opt("", "All Statuses")}
         ${opt("scheduled", "Scheduled")}
         ${opt("active", "Active")}
@@ -236,8 +238,8 @@ function render(user, schedules) {
         ${opt("delayed", "Delayed")}
         ${opt("emergency", "Emergency")}
       </select>
-      <input class="filter-input" type="date" id="date-from-filter" value="${_dateFrom}" style="max-width:160px" title="From date">
-      <input class="filter-input" type="date" id="date-to-filter" value="${_dateTo}" style="max-width:160px" title="To date">
+      <input class="filter-input sched-date-filter" type="date" id="date-from-filter" value="${_dateFrom}" title="From date">
+      <input class="filter-input sched-date-filter" type="date" id="date-to-filter" value="${_dateTo}" title="To date">
       <button class="ghost-btn" id="schedule-filter-btn" type="button">Filter</button>
       <button class="ghost-btn" id="schedule-clear-btn" type="button">Clear</button>
       <div class="view-toggle" role="group" aria-label="View mode">

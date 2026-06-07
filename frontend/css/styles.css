@@ -467,6 +467,7 @@ body {
   min-height: 100vh;
   padding: 0;
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -1805,10 +1806,16 @@ body {
   text-align: center;
 }
 
+.cal-scroll-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .cal-header-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(52px, 1fr));
   border-bottom: 2px solid var(--line);
+  min-width: 364px;
 }
 
 .cal-header-cell {
@@ -1823,9 +1830,10 @@ body {
 
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(52px, 1fr));
   border-left: 1px solid var(--line);
   border-top: 1px solid var(--line);
+  min-width: 364px;
 }
 
 .cal-cell {
@@ -1908,6 +1916,13 @@ body {
 
 .cal-more:hover { background: var(--blue-light); color: var(--blue); }
 
+.cal-event-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .view-toggle {
   display: inline-flex;
   border: 1px solid var(--line-strong);
@@ -1932,10 +1947,30 @@ body {
 .view-toggle-btn.active           { background: var(--blue); color: white; }
 .view-toggle-btn:not(.active):hover { background: var(--surface); color: var(--text); }
 
+/* Schedule filter input sizes — controlled by CSS, not inline styles */
+.sched-status-filter { max-width: 180px; }
+.sched-date-filter   { max-width: 160px; }
+
 @media (max-width: 768px) {
   .cal-cell { min-height: 60px; padding: 4px 3px 2px; }
   .cal-month-title { min-width: 150px; font-size: 15px; }
-  .cal-event { font-size: 10px; padding: 1px 4px; }
+  .cal-event { font-size: 10px; padding: 1px 3px; gap: 2px; }
+  .cal-header-cell { font-size: 9px; padding: 5px 2px; letter-spacing: 0.03em; }
+  .sched-status-filter,
+  .sched-date-filter { max-width: 100%; }
+  .view-toggle { flex-shrink: 0; }
+}
+
+@media (max-width: 480px) {
+  .cal-cell { min-height: 36px; padding: 2px 1px 1px; }
+  .cal-event-label { display: none; }
+  .cal-event { padding: 1px 2px; gap: 1px; margin-bottom: 1px; }
+  .cal-event-dot { width: 8px; height: 8px; }
+  .cal-more { font-size: 9px; padding: 0 2px; margin-top: 0; }
+  .cal-nav { gap: 6px; }
+  .cal-month-title { font-size: 13px; min-width: 120px; }
+  .cal-header-cell { font-size: 8px; padding: 4px 1px; letter-spacing: 0; }
+  .view-toggle-btn { padding: 6px 10px; }
 }
 
 /* ═══════════════════════════════════════════
