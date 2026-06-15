@@ -48,6 +48,7 @@ class MaintenanceCostItem(BaseModel):
 class OperationsSummaryResponse(BaseModel):
     total_routes: int
     total_schedules: int
+    scheduled_schedules: int
     completed_schedules: int
     active_schedules: int
     delayed_schedules: int

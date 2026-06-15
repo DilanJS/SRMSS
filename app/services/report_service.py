@@ -142,6 +142,7 @@ class ReportService:
         return OperationsSummaryResponse(
             total_routes=len(routes),
             total_schedules=len(schedules),
+            scheduled_schedules=sum(1 for schedule in schedules if schedule.status == "scheduled"),
             completed_schedules=sum(1 for schedule in schedules if schedule.status == "completed"),
             active_schedules=sum(1 for schedule in schedules if schedule.status == "active"),
             delayed_schedules=sum(1 for schedule in schedules if schedule.status == "delayed"),

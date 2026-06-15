@@ -78,26 +78,28 @@ function initCharts(report) {
   // 1. Trip status doughnut
   const ctx1 = document.getElementById("chart-trip-status");
   if (ctx1) {
-    const scheduled = s.total_schedules - s.completed_schedules - s.active_schedules
-      - s.delayed_schedules - s.emergency_schedules - s.cancelled_schedules;
-    _charts.push(new Chart(ctx1, {
-      type: "doughnut",
-      data: {
-        labels: ["Completed", "Active", "Delayed", "Emergency", "Cancelled", "Scheduled"],
-        datasets: [{
-          data: [
-            s.completed_schedules, s.active_schedules, s.delayed_schedules,
-            s.emergency_schedules, s.cancelled_schedules, Math.max(0, scheduled),
-          ],
-          backgroundColor: [COLORS.green, COLORS.blue, COLORS.amber, COLORS.red, COLORS.slate, "#cbd5e1"],
-          borderWidth: 1,
-        }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
-      },
-    }));
+    if (s.total_schedules === 0) {
+      ctx1.parentElement.innerHTML = '<p style="text-align:center;color:#94a3b8;padding-top:80px;">No trip data for the selected period.</p>';
+    } else {
+      _charts.push(new Chart(ctx1, {
+        type: "doughnut",
+        data: {
+          labels: ["Completed", "Active", "Delayed", "Emergency", "Cancelled", "Scheduled"],
+          datasets: [{
+            data: [
+              s.completed_schedules, s.active_schedules, s.delayed_schedules,
+              s.emergency_schedules, s.cancelled_schedules, s.scheduled_schedules,
+            ],
+            backgroundColor: [COLORS.green, COLORS.blue, COLORS.amber, COLORS.red, COLORS.slate, "#cbd5e1"],
+            borderWidth: 1,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+        },
+      }));
+    }
   }
 
   // 2. Route performance stacked bar (top 5 routes by trip count)
