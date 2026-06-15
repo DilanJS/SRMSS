@@ -216,11 +216,14 @@ function render(user, schedules) {
   const opt = (val, label) =>
     `<option value="${val}" ${_currentStatusFilter === val ? "selected" : ""}>${label}</option>`;
 
+  const isDriverView = _role === "driver";
   _container.innerHTML = renderManagementPage({
     user,
     activeNav: "schedules",
-    title: "Schedule Management",
-    subtitle: "Plan and monitor all route trips, detect conflicts, and handle emergency updates.",
+    title: isDriverView ? "My Schedules" : "Schedule Management",
+    subtitle: isDriverView
+      ? "View your assigned route trips and departure times."
+      : "Plan and monitor all route trips, detect conflicts, and handle emergency updates.",
     statsCards: [
       { label: "Total", value: _total },
       { label: "Scheduled", value: _summary.scheduled ?? 0 },

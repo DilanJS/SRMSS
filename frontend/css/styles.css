@@ -2434,3 +2434,115 @@ body {
   box-shadow: 0 0 0 3px color-mix(in srgb, #6366f1 35%, transparent),
               0 2px 8px rgba(0,0,0,0.3);
 }
+
+/* ═══════════════════════════════════════════
+   REPORTS — RESPONSIVE LAYOUT
+   ═══════════════════════════════════════════ */
+
+/* 4-column stats variant (overrides the 5-column default) */
+.stats-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Chart containers — height adapts at breakpoints */
+.chart-wrap {
+  position: relative;
+  height: 260px;
+}
+.chart-wrap-sm {
+  height: 220px;
+}
+
+/* Charts side-by-side (equal halves, unlike management-grid's 1.2/.8 split) */
+.reports-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Fuel + Maintenance tables side by side */
+.reports-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Quick-filter strip */
+.reports-quickfilter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reports-quickfilter-label {
+  font-size: 12px;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.reports-period-btn {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+/* Apply / Clear buttons sit at the bottom of the field row */
+.reports-apply-btn,
+.reports-clear-btn {
+  align-self: flex-end;
+}
+
+/* ── Breakpoint: large tablet (≤ 1200px) ── */
+@media (max-width: 1200px) {
+  .stats-grid-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ── Breakpoint: tablet (≤ 1024px) ── */
+@media (max-width: 1024px) {
+  .reports-charts-grid,
+  .reports-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Breakpoint: mobile (≤ 768px) ── */
+@media (max-width: 768px) {
+  .stats-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-wrap    { height: 220px; }
+  .chart-wrap-sm { height: 180px; }
+
+  .reports-quickfilter {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .reports-period-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .export-pdf-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Breakpoint: small mobile (≤ 480px) ── */
+@media (max-width: 480px) {
+  .stats-grid-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chart-wrap    { height: 180px; }
+  .chart-wrap-sm { height: 160px; }
+
+  .reports-period-btn {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+}

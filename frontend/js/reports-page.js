@@ -183,14 +183,14 @@ function render(user, report, dateFrom, dateTo) {
               <label>To</label>
               <input type="date" id="date-to" value="${dateTo}">
             </div>
-            <button class="primary-btn" id="apply-filter-btn" style="align-self:flex-end">Apply</button>
-            <button class="ghost-btn" id="clear-filter-btn" style="align-self:flex-end">Clear</button>
+            <button class="primary-btn reports-apply-btn" id="apply-filter-btn">Apply</button>
+            <button class="ghost-btn reports-clear-btn" id="clear-filter-btn">Clear</button>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <span style="font-size:12px;color:var(--text-soft);">Quick:</span>
-            <button class="ghost-btn" id="filter-this-week" type="button" style="font-size:12px;padding:6px 10px;">This Week</button>
-            <button class="ghost-btn" id="filter-this-month" type="button" style="font-size:12px;padding:6px 10px;">This Month</button>
-            <button class="ghost-btn" id="filter-last-month" type="button" style="font-size:12px;padding:6px 10px;">Last Month</button>
+          <div class="reports-quickfilter">
+            <span class="reports-quickfilter-label">Quick:</span>
+            <button class="ghost-btn reports-period-btn" id="filter-this-week" type="button">This Week</button>
+            <button class="ghost-btn reports-period-btn" id="filter-this-month" type="button">This Month</button>
+            <button class="ghost-btn reports-period-btn" id="filter-last-month" type="button">Last Month</button>
             <button class="ghost-btn export-pdf-btn" id="export-pdf-btn" type="button">Export PDF</button>
           </div>
         </div>
@@ -205,7 +205,7 @@ function render(user, report, dateFrom, dateTo) {
         </div>
 
         <!-- Summary stats row 2 -->
-        <div class="stats-grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+        <div class="stats-grid stats-grid-4">
           <article class="stat-card"><div class="stat-card-body"><span>Active Schedules</span><strong>${s.active_schedules}</strong></div></article>
           <article class="stat-card"><div class="stat-card-body"><span>Delayed</span><strong>${s.delayed_schedules}</strong></div></article>
           <article class="stat-card"><div class="stat-card-body"><span>Emergency</span><strong>${s.emergency_schedules}</strong></div></article>
@@ -213,16 +213,16 @@ function render(user, report, dateFrom, dateTo) {
         </div>
 
         <!-- Charts row: doughnut + stacked bar -->
-        <div class="management-grid">
+        <div class="reports-charts-grid">
           <section class="panel">
             <h3>Trip Status Breakdown</h3>
-            <div style="position:relative;height:260px;">
+            <div class="chart-wrap">
               <canvas id="chart-trip-status"></canvas>
             </div>
           </section>
           <section class="panel">
             <h3>Route Performance — Top 5</h3>
-            <div style="position:relative;height:260px;">
+            <div class="chart-wrap">
               <canvas id="chart-route-performance"></canvas>
             </div>
           </section>
@@ -231,7 +231,7 @@ function render(user, report, dateFrom, dateTo) {
         <!-- Fuel consumption bar chart -->
         <section class="panel">
           <h3>Fuel Consumption by Vehicle</h3>
-          <div style="position:relative;height:220px;">
+          <div class="chart-wrap chart-wrap-sm">
             <canvas id="chart-fuel-consumption"></canvas>
           </div>
         </section>
@@ -275,7 +275,7 @@ function render(user, report, dateFrom, dateTo) {
         </section>
 
         <!-- Fuel + Maintenance side by side -->
-        <div class="management-grid">
+        <div class="reports-bottom-grid">
           <section class="panel">
             <h3>Fuel Consumption</h3>
             ${renderEntityTable({

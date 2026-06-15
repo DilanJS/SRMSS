@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 from app.routes.auth import get_current_user, require_roles
 from app.schemas.auth import MessageResponse, UserResponse
 from app.schemas.common import PaginatedResponse, paginate
+from app.schemas.driver import DriverListQuery
 from app.schemas.schedule import (
     EmergencyScheduleUpdateRequest,
     RecurringScheduleRequest,
@@ -15,6 +16,7 @@ from app.schemas.schedule import (
     ScheduleResponse,
     ScheduleUpdateRequest,
 )
+from app.services.driver_service import driver_manager
 from app.services.schedule_service import schedule_manager
 
 router = APIRouter(prefix="/schedules", tags=["Schedules"])
@@ -56,7 +58,13 @@ def list_schedules(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=15, ge=1, le=1000),
 ) -> PaginatedResponse[ScheduleResponse]:
-    del current_user
+    if current_user.role == "driver":
+        all_drivers = driver_manager.list_drivers(DriverListQuery())
+        matched = next(
+            (d for d in all_drivers if d.full_name.lower() == current_user.full_name.lower()),
+            None,
+        )
+        driver_id = matched.id if matched else "__no_match__"
     query = ScheduleListQuery(
         route_id=route_id,
         vehicle_id=vehicle_id,
